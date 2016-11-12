@@ -14,7 +14,12 @@ namespace ZhentarTweaks
 	{
 		private static bool DoInject()
 		{
-			//if (!DoDetour(typeof(RimworldClass), typeof(ModClass), "MethodName")) return false;
+			if (!DoDetour(typeof(TradeUI), typeof(Experiments), "DrawPrice")) return false;
+
+			var assembly = typeof(GameInitData).Assembly;
+			var quickStarter = assembly.GetType("Verse.QuickStarter");
+
+			if (!DoDetour(quickStarter, typeof(Experiments), "CheckQuickStart")) return false;
 
 			return true;
 		}

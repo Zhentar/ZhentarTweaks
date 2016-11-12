@@ -50,7 +50,8 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="Source\Class1.cs" />
+    <Compile Include="Source\Designators.cs" />
+    <Compile Include="Source\Experiments.cs" />
     <Compile Include="Source\Detours.cs" />
     <Compile Include="Source\DetourInjector.cs" />
     <Compile Include="Source\Properties\AssemblyInfo.cs" />
