@@ -49,7 +49,7 @@ namespace ZhentarTweaks
 				{
 					return new AcceptanceReport("OutOfBounds".Translate());
 				}
-				if (current.InNoBuildEdgeArea())
+				if (current.InNoBuildEdgeArea() && entDef != ThingDefOf.DeepDrill)
 				{
 					return "TooCloseToMapEdge".Translate();
 				}
