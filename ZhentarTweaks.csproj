@@ -50,6 +50,7 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="Source\RoofGrid.cs" />
     <Compile Include="Source\Designators.cs" />
     <Compile Include="Source\Detours.cs" />
     <Compile Include="Source\JobGiver_OptimizeApparel.cs" />

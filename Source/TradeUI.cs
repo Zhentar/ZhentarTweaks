@@ -10,7 +10,7 @@ namespace ZhentarTweaks
 {
 	class TradeUI
 	{
-		[DetourClassMethod(typeof(TradeUI))]
+		[DetourClassMethod(typeof(RimWorld.TradeUI))]
 		private static void DrawPrice(Rect rect, Tradeable trad, TradeAction action)
 		{
 			if (trad.IsCurrency || !trad.TraderWillTrade)
