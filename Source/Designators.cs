@@ -364,7 +364,7 @@ namespace ZhentarTweaks
 			{
 				var intVec = Gen.MouseCell();
 				float totalFertility = 0;
-				foreach (var cell in GenRadial.RadialCellsAround(intVec, 5.8f, true))
+				foreach (var cell in GenRadial.RadialCellsAround(intVec, 5.8f, false))
 				{
 					var fertility = Find.FertilityGrid.FertilityAt(cell);
 					if (fertility >= 0.4)
