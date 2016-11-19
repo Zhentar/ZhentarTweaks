@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using RimWorld;
+using UnityEngine;
 using Verse;
 
 namespace ZhentarTweaks
@@ -286,6 +287,112 @@ namespace ZhentarTweaks
 		public static BuildableDef BuiltDefOf(ThingDef def)
 		{
 			return (def.entityDefToBuild == null) ? def : def.entityDefToBuild;
+		}
+
+		[StaticConstructorOnStartup]
+		public class SunLampPlanDesignatorAdd : Designator
+		{
+			static SunLampPlanDesignatorAdd()
+			{
+				var resolvedDesignatorGetter = Utils.GetFieldAccessor<DesignationCategoryDef, List<Designator>>("resolvedDesignators");
+				var orders = DefDatabase<DesignationCategoryDef>.AllDefs.FirstOrDefault(def => def.defName == "Orders");
+				resolvedDesignatorGetter(orders).Add(new SunLampPlanDesignatorAdd());
+			}
+
+			private readonly DesignationDef desDef = DesignationDefOf.Plan;
+
+			public SunLampPlanDesignatorAdd()
+			{
+				this.soundDragSustain = SoundDefOf.DesignateDragStandard;
+				this.soundDragChanged = SoundDefOf.DesignateDragStandardChanged;
+				this.useMouseIcon = true;
+				this.desDef = DesignationDefOf.Plan;
+				this.defaultLabel = "Sun Lamp Plan";
+				this.defaultDesc = "Place planning designations in the shape of a sun lamp radius";
+				this.icon = ContentFinder<Texture2D>.Get("UI/Designators/PlanOn");
+				this.soundSucceeded = SoundDefOf.DesignatePlanAdd;
+			}
+
+			public override AcceptanceReport CanDesignateCell(IntVec3 c)
+			{
+				if (!c.InBounds())
+				{
+					return false;
+				}
+				if (c.InNoBuildEdgeArea())
+				{
+					return "TooCloseToMapEdge".Translate();
+				}
+				
+				return true;
+			}
+
+			public override void DesignateSingleCell(IntVec3 c)
+			{
+				//Find.DesignationManager.AddDesignation(new Designation(c, this.desDef));
+				foreach (var cell in GenRadial.RadialCellsAround(c, 5.8f, true))
+				{
+					if (Find.DesignationManager.DesignationAt(cell, this.desDef) == null)
+					{
+						Find.DesignationManager.AddDesignation(new Designation(cell, this.desDef));
+					}
+				}
+
+			}
+
+			public override void SelectedUpdate()
+			{
+				GenUI.RenderMouseoverBracket();
+				GenDraw.DrawNoBuildEdgeLines();
+				if (!ArchitectCategoryTab.InfoRect.Contains(GenUI.AbsMousePosition()))
+				{
+					IntVec3 intVec = Gen.MouseCell();
+					Color ghostCol;
+					if (this.CanDesignateCell(intVec).Accepted)
+					{
+						ghostCol = new Color(0.5f, 1f, 0.6f, 0.4f);
+					}
+					else
+					{
+						ghostCol = new Color(1f, 0f, 0f, 0.4f);
+					}
+					GenDraw.DrawRadiusRing(Gen.MouseCell(), 5.8f);
+				}
+			}
+
+			public override void DrawMouseAttachments()
+			{
+				var intVec = Gen.MouseCell();
+				float totalFertility = 0;
+				foreach (var cell in GenRadial.RadialCellsAround(intVec, 5.8f, true))
+				{
+					var fertility = Find.FertilityGrid.FertilityAt(cell);
+					if (fertility >= 0.4)
+					{
+						Vector3 v = GenWorldUI.LabelDrawPosFor(cell);
+						GenWorldUI.DrawThingLabel(v, fertility.ToString(), FertilityColor(fertility));
+					}
+					totalFertility += fertility;
+				}
+				var avgFertility = totalFertility / GenRadial.NumCellsInRadius(5.8f);
+				Text.Font = GameFont.Medium;
+				Rect rect = new Rect(Event.current.mousePosition.x + 19f, Event.current.mousePosition.y + 19f, 100f, 100f);
+				GUI.color = FertilityColor(avgFertility);
+				Widgets.Label(rect, avgFertility.ToString("F2"));
+				GUI.color = Color.white;
+				GenUI.DrawMouseAttachment(null, string.Empty);
+			}
+
+			private static readonly Color ColorInfertile = Color.red;
+
+			private static readonly Color ColorFertile = Color.green;
+
+			private static Color FertilityColor(float fertility)
+			{
+				float num = Mathf.InverseLerp(0, 1.4f, fertility);
+				num = Mathf.Clamp01(num);
+				return Color.Lerp(ColorInfertile, ColorFertile, num);
+			}
 		}
 	}
 }
