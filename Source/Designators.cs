@@ -289,6 +289,9 @@ namespace ZhentarTweaks
 			return (def.entityDefToBuild == null) ? def : def.entityDefToBuild;
 		}
 
+		[DetourClassMethod(typeof(AreaManager))]
+		public bool CanMakeNewAllowed(AllowedAreaMode mode) => true;
+
 		[StaticConstructorOnStartup]
 		public class SunLampPlanDesignatorAdd : Designator
 		{
@@ -366,6 +369,8 @@ namespace ZhentarTweaks
 				float totalFertility = 0;
 				foreach (var cell in GenRadial.RadialCellsAround(intVec, 5.8f, false))
 				{
+					if (Find.FogGrid.IsFogged(cell)) continue;
+					
 					var fertility = Find.FertilityGrid.FertilityAt(cell);
 					if (fertility >= 0.4)
 					{
@@ -374,7 +379,7 @@ namespace ZhentarTweaks
 					}
 					totalFertility += fertility;
 				}
-				var avgFertility = totalFertility / GenRadial.NumCellsInRadius(5.8f);
+				var avgFertility = totalFertility / (GenRadial.NumCellsInRadius(5.8f) - 1);
 				Text.Font = GameFont.Medium;
 				Rect rect = new Rect(Event.current.mousePosition.x + 19f, Event.current.mousePosition.y + 19f, 100f, 100f);
 				GUI.color = FertilityColor(avgFertility);
