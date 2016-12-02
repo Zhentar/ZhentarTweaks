@@ -1,7 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Text;
 using RimWorld;
 using UnityEngine;
 using Verse;
@@ -157,7 +156,7 @@ namespace ZhentarTweaks
 					return new AcceptanceReport("BeingSmoothed".Translate());
 				}
 			}
-			if (!CanBuildOnTerrain(entDef, center, rot, thingToIgnore))
+			if (!GenConstruct.CanBuildOnTerrain(entDef, center, rot, thingToIgnore))
 			{
 				return new AcceptanceReport("TerrainCannotSupport".Translate());
 			}
@@ -172,7 +171,7 @@ namespace ZhentarTweaks
 						Thing thing3 = thingList[l];
 						if (thing3 != thingToIgnore)
 						{
-							if (!CanPlaceBlueprintOver(entDef, thing3.def))
+							if (!GenConstruct.CanPlaceBlueprintOver(entDef, thing3.def))
 							{
 								return new AcceptanceReport("SpaceAlreadyOccupied".Translate());
 							}
@@ -195,100 +194,7 @@ namespace ZhentarTweaks
 			return AcceptanceReport.WasAccepted;
 		}
 
-		public static bool CanBuildOnTerrain(BuildableDef entDef, IntVec3 c, Rot4 rot, Thing thingToIgnore = null)
-		{
-			TerrainDef terrainDef = entDef as TerrainDef;
-			if (terrainDef != null && !c.GetTerrain().changeable)
-			{
-				return false;
-			}
-			CellRect cellRect = GenAdj.OccupiedRect(c, rot, entDef.Size);
-			cellRect.ClipInsideMap();
-			CellRect.CellRectIterator iterator = cellRect.GetIterator();
-			while (!iterator.Done())
-			{
-				TerrainDef terrainDef2 = Find.TerrainGrid.TerrainAt(iterator.Current);
-				if (!terrainDef2.affordances.Contains(entDef.terrainAffordanceNeeded))
-				{
-					return false;
-				}
-				List<Thing> thingList = iterator.Current.GetThingList();
-				for (int i = 0; i < thingList.Count; i++)
-				{
-					if (thingList[i] != thingToIgnore)
-					{
-						TerrainDef terrainDef3 = thingList[i].def.entityDefToBuild as TerrainDef;
-						if (terrainDef3 != null && !terrainDef3.affordances.Contains(entDef.terrainAffordanceNeeded))
-						{
-							return false;
-						}
-					}
-				}
-				iterator.MoveNext();
-			}
-			return true;
-		}
-
-		public static bool CanPlaceBlueprintOver(BuildableDef newDef, ThingDef oldDef)
-		{
-			if (oldDef.EverHaulable)
-			{
-				return true;
-			}
-			TerrainDef terrainDef = newDef as TerrainDef;
-			if (terrainDef != null)
-			{
-				if (oldDef.category == ThingCategory.Building && !terrainDef.affordances.Contains(oldDef.terrainAffordanceNeeded))
-				{
-					return false;
-				}
-				if ((oldDef.IsBlueprint || oldDef.IsFrame) && !terrainDef.affordances.Contains(oldDef.entityDefToBuild.terrainAffordanceNeeded))
-				{
-					return false;
-				}
-			}
-			ThingDef thingDef = newDef as ThingDef;
-			BuildableDef buildableDef = BuiltDefOf(oldDef);
-			ThingDef thingDef2 = buildableDef as ThingDef;
-			if (oldDef == ThingDefOf.SteamGeyser && !newDef.ForceAllowPlaceOver(oldDef))
-			{
-				return false;
-			}
-			if (oldDef.category == ThingCategory.Plant && oldDef.passability == Traversability.Impassable && thingDef != null && thingDef.category == ThingCategory.Building && !thingDef.building.canPlaceOverImpassablePlant)
-			{
-				return false;
-			}
-			if (oldDef.category == ThingCategory.Building || oldDef.IsBlueprint || oldDef.IsFrame)
-			{
-				if (thingDef != null)
-				{
-					if (!thingDef.IsEdifice())
-					{
-						return (oldDef.building == null || oldDef.building.canBuildNonEdificesUnder) && (!thingDef.EverTransmitsPower || !oldDef.EverTransmitsPower);
-					}
-					if (thingDef.IsEdifice() && oldDef != null && oldDef.category == ThingCategory.Building && !oldDef.IsEdifice())
-					{
-						return thingDef.building == null || thingDef.building.canBuildNonEdificesUnder;
-					}
-					if (thingDef2 != null && thingDef2 == ThingDefOf.Wall && thingDef.building != null && thingDef.building.canPlaceOverWall)
-					{
-						return true;
-					}
-					if (newDef != ThingDefOf.PowerConduit && buildableDef == ThingDefOf.PowerConduit)
-					{
-						return true;
-					}
-				}
-				return (newDef is TerrainDef && buildableDef is ThingDef && ((ThingDef)buildableDef).CoexistsWithFloors) || (buildableDef is TerrainDef && !(newDef is TerrainDef));
-			}
-			return true;
-		}
-
-		public static BuildableDef BuiltDefOf(ThingDef def)
-		{
-			return (def.entityDefToBuild == null) ? def : def.entityDefToBuild;
-		}
-
+		
 		[DetourClassMethod(typeof(AreaManager))]
 		public bool CanMakeNewAllowed(AllowedAreaMode mode) => true;
 
@@ -369,9 +275,10 @@ namespace ZhentarTweaks
 				float totalFertility = 0;
 				foreach (var cell in GenRadial.RadialCellsAround(intVec, 5.8f, false))
 				{
+					if (!cell.InBounds()) continue;
 					if (Find.FogGrid.IsFogged(cell)) continue;
 					
-					var fertility = Find.FertilityGrid.FertilityAt(cell);
+					var fertility = CalculateFertilityAt(cell);
 					if (fertility >= 0.4)
 					{
 						Vector3 v = GenWorldUI.LabelDrawPosFor(cell);
@@ -383,10 +290,27 @@ namespace ZhentarTweaks
 				Text.Font = GameFont.Medium;
 				Rect rect = new Rect(Event.current.mousePosition.x + 19f, Event.current.mousePosition.y + 19f, 100f, 100f);
 				GUI.color = FertilityColor(avgFertility);
-				Widgets.Label(rect, avgFertility.ToString("F2"));
+				Widgets.Label(rect, avgFertility.ToString("F3"));
 				GUI.color = Color.white;
 				GenUI.DrawMouseAttachment(null, string.Empty);
 			}
+			
+			private float CalculateFertilityAt(IntVec3 loc)
+			{
+				Thing edifice = loc.GetEdifice();
+				if (edifice != null && edifice.def.fertility >= 0.0)
+					return edifice.def.fertility;
+				if (Find.TerrainGrid.TerrainAt(loc).fertility > 0.0)
+					return Find.TerrainGrid.TerrainAt(loc).fertility;
+				var underGrid = underGridGet(Find.TerrainGrid);
+				var underTerrain = underGrid[CellIndices.CellToIndex(loc)];
+				return (underTerrain?.fertility).GetValueOrDefault();
+			}
+
+
+
+			private static readonly Func<TerrainGrid, TerrainDef[]> underGridGet = Utils.GetFieldAccessor<TerrainGrid, TerrainDef[]>("underGrid");
+			
 
 			private static readonly Color ColorInfertile = Color.red;
 
