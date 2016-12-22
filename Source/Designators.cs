@@ -7,59 +7,62 @@ using Verse;
 
 namespace ZhentarTweaks
 {
-	class Designators
+	class _Designate_SmoothFloor : Designator_SmoothFloor
 	{
 		[DetourClassMethod(typeof(Designator_SmoothFloor))]
-		public AcceptanceReport CanDesignateCell(IntVec3 c)
+		public override AcceptanceReport CanDesignateCell(IntVec3 c)
 		{
-			if (!c.InBounds())
+			if (!c.InBounds(Map))
 			{
 				return false;
 			}
-			if (c.Fogged())
+			if (c.Fogged(Map))
 			{
 				return false;
 			}
-			if (Find.DesignationManager.DesignationAt(c, DesignationDefOf.SmoothFloor) != null)
+			if (Map.designationManager.DesignationAt(c, DesignationDefOf.SmoothFloor) != null)
 			{
 				return "TerrainBeingSmoothed".Translate();
 			}
-			Building edifice = c.GetEdifice();
+			Building edifice = c.GetEdifice(Map);
 			if (edifice != null && edifice.def.Fillage == FillCategory.Full && edifice.def.passability == Traversability.Impassable)
 			{
 				return false;
 			}
-			TerrainDef terrain = c.GetTerrain();
+			TerrainDef terrain = c.GetTerrain(Map);
 			if (!terrain.affordances.Contains(TerrainAffordance.SmoothableStone))
 			{
 				return "MessageMustDesignateSmoothableFloor".Translate();
 			}
 			return AcceptanceReport.WasAccepted;
 		}
+	}
 
+	static class _GenConstruct
+	{
 		[DetourClassMethod(typeof(GenConstruct))]
-		public static AcceptanceReport CanPlaceBlueprintAt(BuildableDef entDef, IntVec3 center, Rot4 rot, bool godMode = false, Thing thingToIgnore = null)
+		public static AcceptanceReport CanPlaceBlueprintAt(BuildableDef entDef, IntVec3 center, Rot4 rot, Map map, bool godMode = false, Thing thingToIgnore = null)
 		{
 			CellRect cellRect = GenAdj.OccupiedRect(center, rot, entDef.Size);
 			CellRect.CellRectIterator iterator = cellRect.GetIterator();
 			while (!iterator.Done())
 			{
 				IntVec3 current = iterator.Current;
-				if (!current.InBounds())
+				if (!current.InBounds(map))
 				{
 					return new AcceptanceReport("OutOfBounds".Translate());
 				}
-				if (current.InNoBuildEdgeArea() && entDef != ThingDefOf.DeepDrill)
+				if (current.InNoBuildEdgeArea(map) && !DebugSettings.godMode && entDef != ThingDefOf.DeepDrill)
 				{
 					return "TooCloseToMapEdge".Translate();
 				}
 				iterator.MoveNext();
 			}
-			if (center.Fogged())
+			if (center.Fogged(map))
 			{
 				return "CannotPlaceInUndiscovered".Translate();
 			}
-			List<Thing> thingList = center.GetThingList();
+			List<Thing> thingList = center.GetThingList(map);
 			for (int i = 0; i < thingList.Count; i++)
 			{
 				Thing thing = thingList[i];
@@ -85,12 +88,12 @@ namespace ZhentarTweaks
 			ThingDef thingDef = entDef as ThingDef;
 			if (thingDef != null && thingDef.hasInteractionCell)
 			{
-				IntVec3 c = Thing.InteractionCellWhenAt(thingDef, center, rot);
-				if (!c.InBounds())
+				IntVec3 c = Thing.InteractionCellWhenAt(thingDef, center, rot, map);
+				if (!c.InBounds(map))
 				{
 					return new AcceptanceReport("InteractionSpotOutOfBounds".Translate());
 				}
-				List<Thing> list = Find.ThingGrid.ThingsListAtFast(c);
+				List<Thing> list = map.thingGrid.ThingsListAtFast(c);
 				for (int j = 0; j < list.Count; j++)
 				{
 					if (list[j] != thingToIgnore)
@@ -111,9 +114,9 @@ namespace ZhentarTweaks
 			{
 				foreach (IntVec3 current2 in GenAdj.CellsAdjacentCardinal(center, rot, entDef.Size))
 				{
-					if (current2.InBounds())
+					if (current2.InBounds(map))
 					{
-						thingList = current2.GetThingList();
+						thingList = current2.GetThingList(map);
 						for (int k = 0; k < thingList.Count; k++)
 						{
 							Thing thing2 = thingList[k];
@@ -126,7 +129,7 @@ namespace ZhentarTweaks
 									ThingDef thingDef2 = blueprint2.def.entityDefToBuild as ThingDef;
 									if (thingDef2 == null)
 									{
-										goto IL_364;
+										goto IL_37E;
 									}
 									thingDef3 = thingDef2;
 								}
@@ -134,12 +137,12 @@ namespace ZhentarTweaks
 								{
 									thingDef3 = thing2.def;
 								}
-								if (thingDef3.hasInteractionCell && cellRect.Contains(Thing.InteractionCellWhenAt(thingDef3, thing2.Position, thing2.Rotation)))
+								if (thingDef3.hasInteractionCell && cellRect.Contains(Thing.InteractionCellWhenAt(thingDef3, thing2.Position, thing2.Rotation, thing2.Map)))
 								{
 									return new AcceptanceReport("WouldBlockInteractionSpot".Translate(entDef.label, thingDef3.label).CapitalizeFirst());
 								}
 							}
-							IL_364:;
+							IL_37E:;
 						}
 					}
 				}
@@ -147,16 +150,16 @@ namespace ZhentarTweaks
 			TerrainDef terrainDef = entDef as TerrainDef;
 			if (terrainDef != null)
 			{
-				if (Find.TerrainGrid.TerrainAt(center) == terrainDef)
+				if (map.terrainGrid.TerrainAt(center) == terrainDef)
 				{
 					return new AcceptanceReport("TerrainIsAlready".Translate(terrainDef.label));
 				}
-				if (Find.DesignationManager.DesignationAt(center, DesignationDefOf.SmoothFloor) != null)
+				if (map.designationManager.DesignationAt(center, DesignationDefOf.SmoothFloor) != null)
 				{
 					return new AcceptanceReport("BeingSmoothed".Translate());
 				}
 			}
-			if (!GenConstruct.CanBuildOnTerrain(entDef, center, rot, thingToIgnore))
+			if (!GenConstruct.CanBuildOnTerrain(entDef, center, map, rot, thingToIgnore))
 			{
 				return new AcceptanceReport("TerrainCannotSupport".Translate());
 			}
@@ -165,7 +168,7 @@ namespace ZhentarTweaks
 				CellRect.CellRectIterator iterator2 = cellRect.GetIterator();
 				while (!iterator2.Done())
 				{
-					thingList = iterator2.Current.GetThingList();
+					thingList = iterator2.Current.GetThingList(map);
 					for (int l = 0; l < thingList.Count; l++)
 					{
 						Thing thing3 = thingList[l];
@@ -184,7 +187,7 @@ namespace ZhentarTweaks
 			{
 				for (int m = 0; m < entDef.PlaceWorkers.Count; m++)
 				{
-					AcceptanceReport result = entDef.PlaceWorkers[m].AllowsPlacing(entDef, center, rot);
+					AcceptanceReport result = entDef.PlaceWorkers[m].AllowsPlacing(entDef, center, rot, thingToIgnore);
 					if (!result.Accepted)
 					{
 						return result;
@@ -194,134 +197,127 @@ namespace ZhentarTweaks
 			return AcceptanceReport.WasAccepted;
 		}
 
-		
+	}
+
+	static class _AreaManager
+	{
+
 		[DetourClassMethod(typeof(AreaManager))]
-		public bool CanMakeNewAllowed(AllowedAreaMode mode) => true;
+		public static bool CanMakeNewAllowed(AllowedAreaMode mode) => true;
+	}
 
-		[StaticConstructorOnStartup]
-		public class SunLampPlanDesignatorAdd : Designator
+	
+	[StaticConstructorOnStartup]
+	public class SunLampPlanDesignatorAdd : Designator
+	{
+		static SunLampPlanDesignatorAdd()
 		{
-			static SunLampPlanDesignatorAdd()
+			var resolvedDesignatorGetter = Utils.GetFieldAccessor<DesignationCategoryDef, List<Designator>>("resolvedDesignators");
+			var orders = DefDatabase<DesignationCategoryDef>.AllDefs.FirstOrDefault(def => def.defName == "Orders");
+			resolvedDesignatorGetter(orders).Add(new SunLampPlanDesignatorAdd());
+		}
+
+		private readonly DesignationDef desDef = DesignationDefOf.Plan;
+
+		public SunLampPlanDesignatorAdd()
+		{
+			this.soundDragSustain = SoundDefOf.DesignateDragStandard;
+			this.soundDragChanged = SoundDefOf.DesignateDragStandardChanged;
+			this.useMouseIcon = true;
+			this.desDef = DesignationDefOf.Plan;
+			this.defaultLabel = "Sun Lamp Plan";
+			this.defaultDesc = "Place planning designations in the shape of a sun lamp radius";
+			this.icon = ContentFinder<Texture2D>.Get("UI/Designators/PlanOn");
+			this.soundSucceeded = SoundDefOf.DesignatePlanAdd;
+		}
+
+		public override AcceptanceReport CanDesignateCell(IntVec3 c)
+		{
+			if (!c.InBounds(Map))
 			{
-				var resolvedDesignatorGetter = Utils.GetFieldAccessor<DesignationCategoryDef, List<Designator>>("resolvedDesignators");
-				var orders = DefDatabase<DesignationCategoryDef>.AllDefs.FirstOrDefault(def => def.defName == "Orders");
-				resolvedDesignatorGetter(orders).Add(new SunLampPlanDesignatorAdd());
+				return false;
+			}
+			if (c.InNoBuildEdgeArea(Map))
+			{
+				return "TooCloseToMapEdge".Translate();
 			}
 
-			private readonly DesignationDef desDef = DesignationDefOf.Plan;
+			return true;
+		}
 
-			public SunLampPlanDesignatorAdd()
+		public override void DesignateSingleCell(IntVec3 c)
+		{
+			foreach (var cell in GenRadial.RadialCellsAround(c, 5.8f, true))
 			{
-				this.soundDragSustain = SoundDefOf.DesignateDragStandard;
-				this.soundDragChanged = SoundDefOf.DesignateDragStandardChanged;
-				this.useMouseIcon = true;
-				this.desDef = DesignationDefOf.Plan;
-				this.defaultLabel = "Sun Lamp Plan";
-				this.defaultDesc = "Place planning designations in the shape of a sun lamp radius";
-				this.icon = ContentFinder<Texture2D>.Get("UI/Designators/PlanOn");
-				this.soundSucceeded = SoundDefOf.DesignatePlanAdd;
-			}
-
-			public override AcceptanceReport CanDesignateCell(IntVec3 c)
-			{
-				if (!c.InBounds())
+				if (Map.designationManager.DesignationAt(cell, this.desDef) == null)
 				{
-					return false;
-				}
-				if (c.InNoBuildEdgeArea())
-				{
-					return "TooCloseToMapEdge".Translate();
-				}
-				
-				return true;
-			}
-
-			public override void DesignateSingleCell(IntVec3 c)
-			{
-				//Find.DesignationManager.AddDesignation(new Designation(c, this.desDef));
-				foreach (var cell in GenRadial.RadialCellsAround(c, 5.8f, true))
-				{
-					if (Find.DesignationManager.DesignationAt(cell, this.desDef) == null)
-					{
-						Find.DesignationManager.AddDesignation(new Designation(cell, this.desDef));
-					}
-				}
-
-			}
-
-			public override void SelectedUpdate()
-			{
-				GenUI.RenderMouseoverBracket();
-				GenDraw.DrawNoBuildEdgeLines();
-				if (!ArchitectCategoryTab.InfoRect.Contains(GenUI.AbsMousePosition()))
-				{
-					IntVec3 intVec = Gen.MouseCell();
-					Color ghostCol;
-					if (this.CanDesignateCell(intVec).Accepted)
-					{
-						ghostCol = new Color(0.5f, 1f, 0.6f, 0.4f);
-					}
-					else
-					{
-						ghostCol = new Color(1f, 0f, 0f, 0.4f);
-					}
-					GenDraw.DrawRadiusRing(Gen.MouseCell(), 5.8f);
+					Map.designationManager.AddDesignation(new Designation(new LocalTargetInfo(cell), this.desDef));
 				}
 			}
+		}
 
-			public override void DrawMouseAttachments()
+		public override void SelectedUpdate()
+		{
+			GenUI.RenderMouseoverBracket();
+			GenDraw.DrawNoBuildEdgeLines();
+			if (!ArchitectCategoryTab.InfoRect.Contains(UI.MousePositionOnUIInverted))
 			{
-				var intVec = Gen.MouseCell();
-				float totalFertility = 0;
-				foreach (var cell in GenRadial.RadialCellsAround(intVec, 5.8f, false))
-				{
-					if (!cell.InBounds()) continue;
-					if (Find.FogGrid.IsFogged(cell)) continue;
+				GenDraw.DrawRadiusRing(UI.MouseCell(), 5.8f);
+			}
+		}
+
+		public override void DrawMouseAttachments()
+		{
+			var intVec = UI.MouseCell();
+			float totalFertility = 0;
+			foreach (var cell in GenRadial.RadialCellsAround(intVec, 5.8f, false))
+			{
+				if (!cell.InBounds(Map)) continue;
+				if (Map.fogGrid.IsFogged(cell)) continue;
 					
-					var fertility = CalculateFertilityAt(cell);
-					if (fertility >= 0.4)
-					{
-						Vector3 v = GenWorldUI.LabelDrawPosFor(cell);
-						GenWorldUI.DrawThingLabel(v, fertility.ToString(), FertilityColor(fertility));
-					}
-					totalFertility += fertility;
+				var fertility = CalculateFertilityAt(cell);
+				if (fertility >= 0.4)
+				{
+					Vector3 v = GenMapUI.LabelDrawPosFor(cell);
+					GenMapUI.DrawThingLabel(v, fertility.ToString(), FertilityColor(fertility));
 				}
-				var avgFertility = totalFertility / (GenRadial.NumCellsInRadius(5.8f) - 1);
-				Text.Font = GameFont.Medium;
-				Rect rect = new Rect(Event.current.mousePosition.x + 19f, Event.current.mousePosition.y + 19f, 100f, 100f);
-				GUI.color = FertilityColor(avgFertility);
-				Widgets.Label(rect, avgFertility.ToString("F3"));
-				GUI.color = Color.white;
-				GenUI.DrawMouseAttachment(null, string.Empty);
+				totalFertility += fertility;
 			}
+			var avgFertility = totalFertility / (GenRadial.NumCellsInRadius(5.8f) - 1);
+			Text.Font = GameFont.Medium;
+			Rect rect = new Rect(Event.current.mousePosition.x + 19f, Event.current.mousePosition.y + 19f, 100f, 100f);
+			GUI.color = FertilityColor(avgFertility);
+			Widgets.Label(rect, avgFertility.ToString("F3"));
+			GUI.color = Color.white;
+			GenUI.DrawMouseAttachment(null, string.Empty);
+		}
 			
-			private float CalculateFertilityAt(IntVec3 loc)
-			{
-				Thing edifice = loc.GetEdifice();
-				if (edifice != null && edifice.def.fertility >= 0.0)
-					return edifice.def.fertility;
-				if (Find.TerrainGrid.TerrainAt(loc).fertility > 0.0)
-					return Find.TerrainGrid.TerrainAt(loc).fertility;
-				var underGrid = underGridGet(Find.TerrainGrid);
-				var underTerrain = underGrid[CellIndices.CellToIndex(loc)];
-				return (underTerrain?.fertility).GetValueOrDefault();
-			}
+		private float CalculateFertilityAt(IntVec3 loc)
+		{
+			Thing edifice = loc.GetEdifice(Map);
+			if (edifice != null && edifice.def.fertility >= 0.0)
+				return edifice.def.fertility;
+			if (Map.terrainGrid.TerrainAt(loc).fertility > 0.0)
+				return Map.terrainGrid.TerrainAt(loc).fertility;
+			var underGrid = underGridGet(Map.terrainGrid);
+			var underTerrain = underGrid[Map.cellIndices.CellToIndex(loc)];
+			return (underTerrain?.fertility).GetValueOrDefault();
+		}
 
 
 
-			private static readonly Func<TerrainGrid, TerrainDef[]> underGridGet = Utils.GetFieldAccessor<TerrainGrid, TerrainDef[]>("underGrid");
+		private static readonly Func<TerrainGrid, TerrainDef[]> underGridGet = Utils.GetFieldAccessor<TerrainGrid, TerrainDef[]>("underGrid");
 			
 
-			private static readonly Color ColorInfertile = Color.red;
+		private static readonly Color ColorInfertile = Color.red;
 
-			private static readonly Color ColorFertile = Color.green;
+		private static readonly Color ColorFertile = Color.green;
 
-			private static Color FertilityColor(float fertility)
-			{
-				float num = Mathf.InverseLerp(0, 1.4f, fertility);
-				num = Mathf.Clamp01(num);
-				return Color.Lerp(ColorInfertile, ColorFertile, num);
-			}
+		private static Color FertilityColor(float fertility)
+		{
+			float num = Mathf.InverseLerp(0, 1.4f, fertility);
+			num = Mathf.Clamp01(num);
+			return Color.Lerp(ColorInfertile, ColorFertile, num);
 		}
 	}
 }

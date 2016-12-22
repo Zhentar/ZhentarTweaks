@@ -1,36 +1,38 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
 using RimWorld;
 using UnityEngine;
 using Verse;
 
 namespace ZhentarTweaks
 {
-	static class RoofGrid
+	static class _RoofGrid
 	{
 
 		private static ThickRoofDrawer thickRoofDrawer;
 
-		public static readonly Func<Verse.RoofGrid, ushort[]> roofGridGetter = Utils.GetFieldAccessor<Verse.RoofGrid, ushort[]>("roofGrid");
+		public static readonly Func<RoofGrid, ushort[]> roofGridGetter = Utils.GetFieldAccessor<RoofGrid, ushort[]>("roofGrid");
 
-		private static readonly Func<Verse.RoofGrid, CellBoolDrawer> drawerGetter = Utils.GetFieldAccessor<Verse.RoofGrid, CellBoolDrawer>("drawerInt");
+		private static readonly Func<RoofGrid, CellBoolDrawer> drawerGetter = Utils.GetFieldAccessor<RoofGrid, CellBoolDrawer>("drawerInt");
 
-		[DetourClassMethod(typeof(Verse.RoofGrid))]
-		public static bool GetCellBool(this Verse.RoofGrid @this, int index)
+		private static readonly Func<RoofGrid, Map> mapGet = Utils.GetFieldAccessor<RoofGrid, Map>("map");
+
+		private static readonly Func<FogGrid, Map> fogMapGet = Utils.GetFieldAccessor<FogGrid, Map>("map");
+
+
+		[DetourClassMethod(typeof(RoofGrid))]
+		public static bool GetCellBool(this RoofGrid @this, int index)
 		{
 			var roofGrid = roofGridGetter(@this);
-			return roofGrid[index] != 0 && (!Find.FogGrid.IsFogged(index) || !DebugViewSettings.drawFog)
+			return roofGrid[index] != 0 && (!mapGet(@this).fogGrid.IsFogged(index) || !DebugViewSettings.drawFog)
 				&& roofGrid[index] != RoofDefOf.RoofRockThick.shortHash;
 		}
 
-		[DetourClassMethod(typeof(Verse.RoofGrid))]
-		public static void RoofGridUpdate(this Verse.RoofGrid @this)
+		[DetourClassMethod(typeof(RoofGrid))]
+		public static void RoofGridUpdate(this RoofGrid @this)
 		{
 			if (drawerGetter(@this) == null)
 			{
-				thickRoofDrawer = new ThickRoofDrawer(@this);
+				thickRoofDrawer = new ThickRoofDrawer(@this,mapGet(@this));
 			}
 			if (Find.PlaySettings.showRoofOverlay)
 			{
@@ -41,49 +43,52 @@ namespace ZhentarTweaks
 			@this.Drawer.CellBoolDrawerUpdate();
 		}
 
-		[DetourClassMethod(typeof(Verse.FogGrid))]
+		[DetourClassMethod(typeof(FogGrid))]
 		public static void Unfog(this FogGrid @this, IntVec3 c)
 		{
-			int num = CellIndices.CellToIndex(c);
+			var map = fogMapGet(@this);
+			int num = fogMapGet(@this).cellIndices.CellToIndex(c);
 			if (!@this.fogGrid[num])
 			{
 				return;
 			}
 			@this.fogGrid[num] = false;
-			if (Current.ProgramState == ProgramState.MapPlaying)
+			if (Current.ProgramState == ProgramState.Playing)
 			{
-				Find.Map.mapDrawer.MapMeshDirty(c, MapMeshFlag.FogOfWar);
+				map.mapDrawer.MapMeshDirty(c, MapMeshFlag.FogOfWar);
 			}
-			Designation designation = Find.DesignationManager.DesignationAt(c, DesignationDefOf.Mine);
-			if (designation != null && MineUtility.MineableInCell(c) == null)
+			Designation designation = map.designationManager.DesignationAt(c, DesignationDefOf.Mine);
+			if (designation != null && MineUtility.MineableInCell(c, map) == null)
 			{
 				designation.Delete();
 			}
-			if (Current.ProgramState == ProgramState.MapPlaying)
+			if (Current.ProgramState == ProgramState.Playing)
 			{
-				Find.RoofGrid.Drawer.SetDirty();
+				map.roofGrid.Drawer.SetDirty();
 				thickRoofDrawer.drawer.SetDirty();
 			}
 		}
 
 		private class ThickRoofDrawer : ICellBoolGiver
 		{
-			private readonly Verse.RoofGrid parent;
+			private readonly RoofGrid parent;
+
+			private readonly Map map;
 
 			public CellBoolDrawer drawer;
 
-			public ThickRoofDrawer(Verse.RoofGrid par)
+			public ThickRoofDrawer(RoofGrid par, Map map)
 			{
 				parent = par;
-				drawer = new CellBoolDrawer(this);
+				this.map = map;
+				drawer = new CellBoolDrawer(this, this.map.Size.x, this.map.Size.z);
 			}
-
 
 			public Color Color => new Color(0.3f, 0.7f, 0.4f);
 
 			public bool GetCellBool(int index)
 			{
-				return roofGridGetter(parent)[index] == RoofDefOf.RoofRockThick.shortHash && !Find.FogGrid.IsFogged(index);
+				return roofGridGetter(parent)[index] == RoofDefOf.RoofRockThick.shortHash && !map.fogGrid.IsFogged(index);
 			}
 		}
 	}
