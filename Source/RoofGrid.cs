@@ -19,7 +19,7 @@ namespace ZhentarTweaks
 		private static readonly Func<FogGrid, Map> fogMapGet = Utils.GetFieldAccessor<FogGrid, Map>("map");
 
 
-		[DetourClassMethod(typeof(RoofGrid))]
+		[DetourMember]
 		public static bool GetCellBool(this RoofGrid @this, int index)
 		{
 			var roofGrid = roofGridGetter(@this);
@@ -27,7 +27,7 @@ namespace ZhentarTweaks
 				&& roofGrid[index] != RoofDefOf.RoofRockThick.shortHash;
 		}
 
-		[DetourClassMethod(typeof(RoofGrid))]
+		[DetourMember]
 		public static void RoofGridUpdate(this RoofGrid @this)
 		{
 			if (drawerGetter(@this) == null)
@@ -43,7 +43,7 @@ namespace ZhentarTweaks
 			@this.Drawer.CellBoolDrawerUpdate();
 		}
 
-		[DetourClassMethod(typeof(FogGrid))]
+		[DetourMember]
 		public static void Unfog(this FogGrid @this, IntVec3 c)
 		{
 			var map = fogMapGet(@this);

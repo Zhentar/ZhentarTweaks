@@ -9,7 +9,7 @@ namespace ZhentarTweaks
 {
 	class _Designate_SmoothFloor : Designator_SmoothFloor
 	{
-		[DetourClassMethod(typeof(Designator_SmoothFloor))]
+		[DetourMember]
 		public override AcceptanceReport CanDesignateCell(IntVec3 c)
 		{
 			if (!c.InBounds(Map))
@@ -40,7 +40,7 @@ namespace ZhentarTweaks
 
 	static class _GenConstruct
 	{
-		[DetourClassMethod(typeof(GenConstruct))]
+		[DetourMember(typeof(GenConstruct))]
 		public static AcceptanceReport CanPlaceBlueprintAt(BuildableDef entDef, IntVec3 center, Rot4 rot, Map map, bool godMode = false, Thing thingToIgnore = null)
 		{
 			CellRect cellRect = GenAdj.OccupiedRect(center, rot, entDef.Size);
@@ -199,11 +199,13 @@ namespace ZhentarTweaks
 
 	}
 
-	static class _AreaManager
+	class _AreaManager : AreaManager
 	{
+		private _AreaManager() : base(null)
+		{ }
 
-		[DetourClassMethod(typeof(AreaManager))]
-		public static bool CanMakeNewAllowed(AllowedAreaMode mode) => true;
+		[DetourMember]
+		public bool CanMakeNewAllowed(AllowedAreaMode mode) => true;
 	}
 
 	
