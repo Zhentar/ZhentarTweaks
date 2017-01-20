@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using HugsLib;
+using HugsLib.Settings;
 using RimWorld;
 using UnityEngine;
 using Verse;
@@ -18,20 +19,19 @@ namespace ZhentarTweaks
 				((Action)(() =>
 				{
 					var settings = HugsLibController.Instance.Settings.GetModSettings("ZhentarTweaks");
-					doYellowLetterHandle = settings.GetHandle("yellowLetterPause", "Pause on yellow letters",
+					//handle can't be saved as a SettingHandle<> type; otherwise the compiler generated closure class will throw a typeloadexception
+					object handle = settings.GetHandle("yellowLetterPause", "Pause on yellow letters",
 						"When the RimWorld Pause on urgent letters setting is set, also pause on yellow letters?", true);
+					DoNonUrgentPause = () => (SettingHandle<bool>)handle;
 				}))();
+				return;
 			}
 			catch (TypeLoadException)
 			{ }
+			DoNonUrgentPause = () => true;
 		}
 
-		private static /*HugsLib.Settings.SettingHandle<bool>*/ object doYellowLetterHandle;
-
-		//Calling this when HugsLib isn't loaded will throw an exception
-		private static T GetSettingsHandleValue<T>(object handle) => handle as HugsLib.Settings.SettingHandle<T> ?? default(T);
-
-		private static bool DoNonUrgentPause => doYellowLetterHandle == null || GetSettingsHandleValue<bool>(doYellowLetterHandle);
+		private static Func<bool> DoNonUrgentPause;
 
 		private static readonly Func<LetterStack, List<Letter>> lettersGet = Utils.GetFieldAccessor<LetterStack, List<Letter>>("letters");
 		
@@ -43,7 +43,7 @@ namespace ZhentarTweaks
 			soundDef.PlayOneShotOnCamera();
 			if (Prefs.PauseOnUrgentLetter && !Find.TickManager.Paused)
 			{
-				if (let.LetterType == LetterType.BadUrgent || ( let.LetterType == LetterType.BadNonUrgent && DoNonUrgentPause) )
+				if (let.LetterType == LetterType.BadUrgent || (let.LetterType == LetterType.BadNonUrgent && DoNonUrgentPause()) )
 				{
 					Find.TickManager.TogglePaused();
 				}
