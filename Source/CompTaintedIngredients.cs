@@ -71,8 +71,17 @@ namespace ZhentarTweaks
 				HumanlikeMat = MaterialPool.MatFrom("humanlike", ShaderDatabase.MetaOverlay);
 				InsectMat = MaterialPool.MatFrom("insect", ShaderDatabase.MetaOverlay);
 				BothMat = MaterialPool.MatFrom("humanlikeinsect", ShaderDatabase.MetaOverlay);
+				SetMaterialScale(HumanlikeMat);
+				SetMaterialScale(InsectMat);
+				SetMaterialScale(BothMat);
 			});
 			BaseAlt = Altitudes.AltitudeFor(AltitudeLayer.MetaOverlays);
+		}
+
+		private static void SetMaterialScale(Material mat)
+		{
+			mat.mainTextureScale = new Vector2(0.75f, 0.75f);
+			mat.mainTextureOffset = new Vector2(0f, 0.25f);
 		}
 
 		[DetourMember]
