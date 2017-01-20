@@ -38,6 +38,10 @@
       <HintPath>..\..\RimWorldWin_Data\Managed\Assembly-CSharp.dll</HintPath>
       <Private>False</Private>
     </Reference>
+    <Reference Include="HugsLib">
+      <HintPath>..\HugsLib\Assemblies\HugsLib.dll</HintPath>
+      <Private>False</Private>
+    </Reference>
     <Reference Include="UnityEngine">
       <HintPath>..\..\RimWorldWin_Data\Managed\UnityEngine.dll</HintPath>
       <Private>False</Private>
@@ -60,15 +64,11 @@
   </ItemGroup>
   <ItemGroup>
     <Folder Include="Defs\" />
+    <Folder Include="Textures\" />
   </ItemGroup>
   <ItemGroup>
     <None Include="About\About.xml" />
     <None Include="About\Preview.png" />
-  </ItemGroup>
-  <ItemGroup>
-    <Content Include="Textures\humanlike.png" />
-    <Content Include="Textures\humanlikeinsect.png" />
-    <Content Include="Textures\insect.png" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 
