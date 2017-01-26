@@ -1,0 +1,15 @@
+﻿<?xml version="1.0" encoding="utf-8" ?>
+<Defs>
+  
+  <TransferableSorterDef>
+    <defName>ValuePerWeight</defName>
+    <label>$ per kg</label>
+    <comparerClass>ZhentarTweaks.TransferableComparer_ValuePerWeight</comparerClass>
+  </TransferableSorterDef>
+  
+  <TransferableSorterDef>
+    <defName>StuffUsed</defName>
+    <label>Material</label>
+    <comparerClass>ZhentarTweaks.TransferableComparer_StuffUsed</comparerClass>
+  </TransferableSorterDef>
+</Defs>

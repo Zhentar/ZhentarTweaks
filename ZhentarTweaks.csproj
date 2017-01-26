@@ -39,7 +39,7 @@
       <Private>False</Private>
     </Reference>
     <Reference Include="HugsLib">
-      <HintPath>..\HugsLib\Assemblies\HugsLib.dll</HintPath>
+      <HintPath>.\HugsLib.dll</HintPath>
       <Private>False</Private>
     </Reference>
     <Reference Include="UnityEngine">
@@ -60,6 +60,8 @@
     <Compile Include="Source\Designators.cs" />
     <Compile Include="Source\Detours.cs" />
     <Compile Include="Source\Properties\AssemblyInfo.cs" />
+    <Compile Include="Source\TransferableComparer_StuffUsed.cs" />
+    <Compile Include="Source\TransferableComparer_ValuePerWeight.cs" />
     <Compile Include="Source\Utils.cs" />
   </ItemGroup>
   <ItemGroup>
