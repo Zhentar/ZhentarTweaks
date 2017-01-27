@@ -17,10 +17,6 @@ namespace ZhentarTweaks
 		private float GetValueFor(ITransferable t)
 		{
 			Thing anyThing = t.AnyThing;
-			if (!anyThing.def.useHitPoints)
-			{
-				return 1f;
-			}
 			return anyThing.MarketValue / anyThing.GetStatValue(StatDefOf.Mass);
 		}
 	}
