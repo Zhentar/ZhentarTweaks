@@ -18,7 +18,7 @@ namespace ZhentarTweaks
 		{
 			Thing anyThing = t.AnyThing;
 
-			return anyThing.Stuff?.LabelAsStuff ?? "";
+			return anyThing.GetInnerIfMinified().Stuff?.LabelAsStuff ?? "";
 		}
 	}
 }
