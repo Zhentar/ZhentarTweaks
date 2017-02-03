@@ -39,6 +39,15 @@ namespace ZhentarTweaks
 
 	}
 
+	public class DetourConstructor : Attribute
+	{
+		public Type TargetClass { get; }
+		public DetourConstructor(Type targetClass)
+		{
+			this.TargetClass = targetClass;
+		}
+	}
+
 	public class DetourPair
 	{
 		public Type sourceMethodTarget;
@@ -79,9 +88,36 @@ namespace ZhentarTweaks
 					Log.Error("Detouring Failed!");
 				}
 			}
+			DoConstructorDetours();
 
 		}
 
+		private static void DoConstructorDetours()
+		{
+			var assembly = typeof(Detours).Assembly;
+			var toTypes = assembly
+				.GetTypes()
+				.Where(toType => (
+					toType.GetConstructors(UniversalBindingFlags).Concat<MethodBase>(toType.GetMethods(UniversalBindingFlags)).Any(c => c.HasAttribute<DetourConstructor>())));
+			foreach (var type in toTypes)
+			{
+				foreach (var constructor in type.GetConstructors(UniversalBindingFlags).Concat<MethodBase>(type.GetMethods(UniversalBindingFlags)).Where(c => c.HasAttribute<DetourConstructor>()))
+				{
+					DetourConstructor detour;
+					constructor.TryGetAttribute<DetourConstructor>(out detour);
+					var destType = detour.TargetClass;
+
+					var targetConstructor = destType.GetConstructors(UniversalBindingFlags)
+						  .FirstOrDefault(ctor => (ctor.GetParameters().Select(checkParameter => checkParameter.ParameterType)
+														  .SequenceEqual(constructor.GetParameters()
+																						 .Skip(GetMethodType(constructor) == MethodType.Extension ? 1 : 0)
+																						 .Select(destinationParameter => destinationParameter.ParameterType)))
+							);
+
+					if (!TryDetourFromToInt(targetConstructor, constructor)) { Log.Error($"Constructor detour failed for {type.FullName}"); }
+				}
+			}
+		}
 
 		/// <summary>
 		/// Gets a list detours in an assembly with matching sequence and timing parameters.
@@ -311,19 +347,20 @@ namespace ZhentarTweaks
 			// Used for deeper method checks to return failure string
 			var reason = string.Empty;
 
-			// Make sure the class containing the detour doesn't contain instance fields
-			if (!DetourContainerClassIsFieldSafe(destinationMethod.DeclaringType))
-			{
-				Log.Error(string.Format("'{0}' contains fields which are not static!  Detours can not be defined in classes which have instance fields!", FullNameOfType(destinationMethod.DeclaringType)));
-				return false;
-			}
+			//Commenting out your safety checks! Always a sign you're on the right track!
+			//// Make sure the class containing the detour doesn't contain instance fields
+			//if (!DetourContainerClassIsFieldSafe(destinationMethod.DeclaringType))
+			//{
+			//	Log.Error(string.Format("'{0}' contains fields which are not static!  Detours can not be defined in classes which have instance fields!", FullNameOfType(destinationMethod.DeclaringType)));
+			//	return false;
+			//}
 
-			// Make sure the two methods are call compatible
-			if (!MethodsAreCallCompatible(GetMethodTargetClass(sourceMethod), sourceMethod, GetMethodTargetClass(destinationMethod), destinationMethod, out reason))
-			{
-				Log.Error(string.Format("Methods are not call compatible when trying to detour '{0}' to '{1}' :: {2}", FullMethodName(sourceMethod), FullMethodName(destinationMethod), reason));
-				return false;
-			}
+			//// Make sure the two methods are call compatible
+			//if (!MethodsAreCallCompatible(GetMethodTargetClass(sourceMethod), sourceMethod, GetMethodTargetClass(destinationMethod), destinationMethod, out reason))
+			//{
+			//	Log.Error(string.Format("Methods are not call compatible when trying to detour '{0}' to '{1}' :: {2}", FullMethodName(sourceMethod), FullMethodName(destinationMethod), reason));
+			//	return false;
+			//}
 
 			// Method is now detoured, we are doneski!
 			return TryDetourFromToInt(sourceMethod, destinationMethod);
@@ -454,7 +491,7 @@ namespace ZhentarTweaks
 		/// </summary>
 		/// <returns>MethodType of method</returns>
 		/// <param name="methodInfo">MethodInfo of method</param>
-		private static MethodType GetMethodType(MethodInfo methodInfo)
+		private static MethodType GetMethodType(MethodBase methodInfo)
 		{
 			if (!methodInfo.IsStatic)
 			{

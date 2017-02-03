@@ -17,7 +17,7 @@ namespace ZhentarTweaks
 		private float GetValueFor(ITransferable t)
 		{
 			Thing anyThing = t.AnyThing;
-			return anyThing.MarketValue / anyThing.GetStatValue(StatDefOf.Mass);
+			return anyThing.GetInnerIfMinified().MarketValue / anyThing.GetStatValue(StatDefOf.Mass);
 		}
 	}
 }

@@ -26,6 +26,7 @@ namespace ZhentarTweaks
 	[StaticConstructorOnStartup]
 	public class CompProperties_TaintedIngredients : CompProperties
 	{
+
 		static CompProperties_TaintedIngredients()
 		{
 			//Detour the constructor to get defs that haven't been loaded yet
