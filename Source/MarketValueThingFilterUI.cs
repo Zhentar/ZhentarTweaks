@@ -217,7 +217,6 @@ namespace ZhentarTweaks
 					float sliderValue = ValueForSliderPos((Event.current.mousePosition.x - rect2.x) / rect2.width);
 					sliderValue = RoundToSignificantDigits(sliderValue, 2);
 					sliderValue = Mathf.Clamp(sliderValue, 0f, max);
-					if (sliderValue == max) { sliderValue = float.MaxValue; }
 					if (curDragEnd == RangeEnd.Min)
 					{
 						if (sliderValue != range.min)
@@ -232,6 +231,7 @@ namespace ZhentarTweaks
 					}
 					else if (curDragEnd == RangeEnd.Max && sliderValue != range.max)
 					{
+						if (sliderValue == max) { sliderValue = float.MaxValue; }
 						range.max = sliderValue;
 						if (range.min > range.max)
 						{
