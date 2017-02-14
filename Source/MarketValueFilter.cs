@@ -43,13 +43,8 @@ namespace ZhentarTweaks
 			{
 				Scribe_Values.LookValue(ref allowedMarketValue, "allowedMarketValue");
 			}
-			else if (Scribe.mode != LoadSaveMode.LoadingVars)
-			{
-				Log.Warning("Failed to replace a ThingFilter");
-			}
 		}
 
-		//TODO: use manual detour to bypass type check and get magic cast
 		[DetourMember] //Also not virtual
 		public void CopyAllowancesFrom(MarketValueFilter other)
 		{

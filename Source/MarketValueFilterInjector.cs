@@ -12,50 +12,6 @@ namespace ZhentarTweaks
 	[StaticConstructorOnStartup]
 	class MarketValueFilterInjector
 	{
-
-		class ThingFilterDetour : ThingFilter
-		{
-			private static readonly Func<object, System.Collections.Generic.HashSet<Verse.ThingDef>> allowedDefsGet = Utils.GetFieldAccessorNoInherit<Verse.ThingFilter, System.Collections.Generic.HashSet<Verse.ThingDef>>("allowedDefs");
-			private static readonly FieldInfo allowedDefsInfo = typeof(Verse.ThingFilter).GetField("allowedDefs", BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.GetField);
-			private System.Collections.Generic.HashSet<Verse.ThingDef> allowedDefs { get { return allowedDefsGet(this); } set { allowedDefsInfo.SetValue(this, value); } }
-			private static readonly Func<object, System.Collections.Generic.List<Verse.SpecialThingFilterDef>> disallowedSpecialFiltersGet = Utils.GetFieldAccessorNoInherit<Verse.ThingFilter, System.Collections.Generic.List<Verse.SpecialThingFilterDef>>("disallowedSpecialFilters");
-			private static readonly FieldInfo disallowedSpecialFiltersInfo = typeof(Verse.ThingFilter).GetField("disallowedSpecialFilters", BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.GetField);
-			private System.Collections.Generic.List<Verse.SpecialThingFilterDef> disallowedSpecialFilters { get { return disallowedSpecialFiltersGet(this); } set { disallowedSpecialFiltersInfo.SetValue(this, value); } }
-			private static readonly Func<object, Verse.FloatRange> allowedHitPointsPercentsGet = Utils.GetFieldAccessorNoInherit<Verse.ThingFilter, Verse.FloatRange>("allowedHitPointsPercents");
-			private static readonly FieldInfo allowedHitPointsPercentsInfo = typeof(Verse.ThingFilter).GetField("allowedHitPointsPercents", BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.GetField);
-			private Verse.FloatRange allowedHitPointsPercents { get { return allowedHitPointsPercentsGet(this); } set { allowedHitPointsPercentsInfo.SetValue(this, value); } }
-			private static readonly Func<object, RimWorld.QualityRange> allowedQualitiesGet = Utils.GetFieldAccessorNoInherit<Verse.ThingFilter, RimWorld.QualityRange>("allowedQualities");
-			private static readonly FieldInfo allowedQualitiesInfo = typeof(Verse.ThingFilter).GetField("allowedQualities", BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.GetField);
-			private RimWorld.QualityRange allowedQualities { get { return allowedQualitiesGet(this); } set { allowedQualitiesInfo.SetValue(this, value); } }
-			private static readonly Func<object, System.Action> settingsChangedCallbackGet = Utils.GetFieldAccessorNoInherit<Verse.ThingFilter, System.Action>("settingsChangedCallback");
-			private static readonly FieldInfo settingsChangedCallbackInfo = typeof(Verse.ThingFilter).GetField("settingsChangedCallback", BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.GetField);
-			private System.Action settingsChangedCallback { get { return settingsChangedCallbackGet(this); } set { settingsChangedCallbackInfo.SetValue(this, value); } }
-			[DetourConstructor(typeof(Verse.ThingFilter))]
-			public void ThingFilter()
-			{
-				this.allowedDefs = new HashSet<ThingDef>();
-				this.disallowedSpecialFilters = new List<SpecialThingFilterDef>();
-				this.allowedHitPointsPercents = FloatRange.ZeroToOne;
-				this.allowedHitPointsConfigurable = true;
-				this.allowedQualities = QualityRange.All;
-				this.allowedQualitiesConfigurable = true;
-			}
-
-			[DetourConstructor(typeof(Verse.ThingFilter))]
-			public void ThingFilter(Action settingsChangedCallback)
-			{
-				this.allowedDefs = new HashSet<ThingDef>();
-				this.disallowedSpecialFilters = new List<SpecialThingFilterDef>();
-				this.allowedHitPointsPercents = FloatRange.ZeroToOne;
-				this.allowedHitPointsConfigurable = true;
-				this.allowedQualities = QualityRange.All;
-				this.allowedQualitiesConfigurable = true;
-				this.settingsChangedCallback = settingsChangedCallback;
-			}
-		}
-
-
-
 		class Bill : Object
 		{
 			private static readonly Func<object, int> loadIDGet = Utils.GetFieldAccessorNoInherit<RimWorld.Bill, int>("loadID");
@@ -79,7 +35,6 @@ namespace ZhentarTweaks
 			private static readonly Func<object, bool> suspendedGet = Utils.GetFieldAccessorNoInherit<RimWorld.Bill, bool>("suspended");
 			private static readonly FieldInfo suspendedInfo = typeof(RimWorld.Bill).GetField("suspended", Detours.UniversalBindingFlags);
 			private bool suspended { get { return suspendedGet(this); } set { suspendedInfo.SetValue(this, value); } }
-
 
 			[DetourConstructor(typeof(RimWorld.Bill))]
 			public Bill(Verse.RecipeDef recipe)
@@ -210,9 +165,6 @@ namespace ZhentarTweaks
 					if (tempFilter != null) { filter.CopyAllowancesFrom(tempFilter); }
 				}
 			}
-
-
-
 		}
 
 		class Dialog_ManageOutfitsDetour : Dialog_ManageOutfits

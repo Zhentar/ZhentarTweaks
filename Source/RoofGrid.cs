@@ -7,17 +7,11 @@ namespace ZhentarTweaks
 {
 	static class _RoofGrid
 	{
-
-		private static ThickRoofDrawer thickRoofDrawer;
-
 		public static readonly Func<RoofGrid, ushort[]> roofGridGetter = Utils.GetFieldAccessor<RoofGrid, ushort[]>("roofGrid");
-
-		private static readonly Func<RoofGrid, CellBoolDrawer> drawerGetter = Utils.GetFieldAccessor<RoofGrid, CellBoolDrawer>("drawerInt");
 
 		private static readonly Func<RoofGrid, Map> mapGet = Utils.GetFieldAccessor<RoofGrid, Map>("map");
 
 		private static readonly Func<FogGrid, Map> fogMapGet = Utils.GetFieldAccessor<FogGrid, Map>("map");
-
 
 		[DetourMember]
 		public static bool GetCellBool(this RoofGrid @this, int index)
@@ -28,26 +22,10 @@ namespace ZhentarTweaks
 		}
 
 		[DetourMember]
-		public static void RoofGridUpdate(this RoofGrid @this)
-		{
-			if (drawerGetter(@this) == null)
-			{
-				thickRoofDrawer = new ThickRoofDrawer(@this,mapGet(@this));
-			}
-			if (Find.PlaySettings.showRoofOverlay)
-			{
-				thickRoofDrawer.drawer.MarkForDraw();
-				@this.Drawer.MarkForDraw();
-			}
-			thickRoofDrawer.drawer.CellBoolDrawerUpdate();
-			@this.Drawer.CellBoolDrawerUpdate();
-		}
-
-		[DetourMember]
 		public static void Unfog(this FogGrid @this, IntVec3 c)
 		{
 			var map = fogMapGet(@this);
-			int num = fogMapGet(@this).cellIndices.CellToIndex(c);
+			int num = map.cellIndices.CellToIndex(c);
 			if (!@this.fogGrid[num])
 			{
 				return;
@@ -65,30 +43,35 @@ namespace ZhentarTweaks
 			if (Current.ProgramState == ProgramState.Playing)
 			{
 				map.roofGrid.Drawer.SetDirty();
-				thickRoofDrawer.drawer.SetDirty();
+				map.GetComponent<ThickRoofDrawer>().Drawer.SetDirty();
 			}
 		}
 
-		private class ThickRoofDrawer : ICellBoolGiver
+		private class ThickRoofDrawer : MapComponent, ICellBoolGiver
 		{
-			private readonly RoofGrid parent;
+			private CellBoolDrawer drawerInt;
 
-			private readonly Map map;
+			public CellBoolDrawer Drawer => drawerInt ?? (drawerInt = new CellBoolDrawer(this, map.Size.x, map.Size.z));
 
-			public CellBoolDrawer drawer;
-
-			public ThickRoofDrawer(RoofGrid par, Map map)
+			public ThickRoofDrawer(Map map) : base(map)
 			{
-				parent = par;
-				this.map = map;
-				drawer = new CellBoolDrawer(this, this.map.Size.x, this.map.Size.z);
+				LongEventHandler.ExecuteWhenFinished(() => { if (map.GetComponent<ThickRoofDrawer>() == null) { map.components.Add(this); } });
 			}
 
 			public Color Color => new Color(0.3f, 0.7f, 0.4f);
 
 			public bool GetCellBool(int index)
 			{
-				return roofGridGetter(parent)[index] == RoofDefOf.RoofRockThick.shortHash && !map.fogGrid.IsFogged(index);
+				return roofGridGetter(map.roofGrid)[index] == RoofDefOf.RoofRockThick.shortHash && !map.fogGrid.IsFogged(index);
+			}
+
+			public override void MapComponentUpdate()
+			{
+				if (Find.PlaySettings.showRoofOverlay)
+				{
+					Drawer.MarkForDraw();
+				}
+				Drawer.CellBoolDrawerUpdate();
 			}
 		}
 	}

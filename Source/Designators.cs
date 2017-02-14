@@ -217,6 +217,7 @@ namespace ZhentarTweaks
 			var resolvedDesignatorGetter = Utils.GetFieldAccessor<DesignationCategoryDef, List<Designator>>("resolvedDesignators");
 			var orders = DefDatabase<DesignationCategoryDef>.AllDefs.FirstOrDefault(def => def.defName == "Orders");
 			resolvedDesignatorGetter(orders).Add(new SunLampPlanDesignatorAdd());
+			orders.specialDesignatorClasses.Add(typeof(SunLampPlanDesignatorAdd));
 		}
 
 		private readonly DesignationDef desDef = DesignationDefOf.Plan;
@@ -306,10 +307,7 @@ namespace ZhentarTweaks
 			return (underTerrain?.fertility).GetValueOrDefault();
 		}
 
-
-
 		private static readonly Func<TerrainGrid, TerrainDef[]> underGridGet = Utils.GetFieldAccessor<TerrainGrid, TerrainDef[]>("underGrid");
-			
 
 		private static readonly Color ColorInfertile = Color.red;
 
