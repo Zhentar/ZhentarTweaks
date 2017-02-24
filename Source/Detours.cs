@@ -4,6 +4,7 @@ using System.Linq;
 using System.Reflection;
 using System.Runtime.CompilerServices;
 using System.Text;
+using Harmony;
 using Verse;
 
 
@@ -11,55 +12,66 @@ namespace ZhentarTweaks
 {
 	//Detour Implementation derived from CCL
 	[AttributeUsage(AttributeTargets.Method | AttributeTargets.Property)]
-	public class DetourMember : Attribute
+	public abstract class DetourMemberBase : Attribute
 	{
 		public const Type DefaultTargetClass = null;
 		public const string DefaultTargetMemberName = "";
 
-		public Type targetClass;
-		public string targetMember;
+		public readonly Type targetClass;
+		public readonly string targetMember;
 
-		public DetourMember(Type targetClass, string targetMember)
+		protected DetourMemberBase(Type targetClass, string targetMember)
 		{
 			this.targetClass = targetClass;
 			this.targetMember = targetMember;
 		}
 
-		public DetourMember(Type targetClass) : this(targetClass, DefaultTargetMemberName)
-		{
-		}
-
-		public DetourMember(string targetMember) : this(DefaultTargetClass, targetMember)
-		{
-		}
-
-		public DetourMember() : this(DefaultTargetClass, DefaultTargetMemberName)
-		{
-		}
-
+		protected DetourMemberBase() : this(DefaultTargetClass, DefaultTargetMemberName) { }
 	}
 
-	public class DetourConstructor : Attribute
+	[AttributeUsage(AttributeTargets.Method | AttributeTargets.Property)]
+	public class DetourMember : DetourMemberBase
+	{
+		public DetourMember(Type targetClass = DefaultTargetClass, string targetMember = DefaultTargetMemberName) : base(targetClass, targetMember) { }
+
+		public DetourMember(string targetMember) : this(DefaultTargetClass, targetMember) { }
+	}
+
+	[AttributeUsage(AttributeTargets.Method | AttributeTargets.Property)]
+	public class DetourMemberHarmonyPostfix : DetourMemberBase
+	{
+		public DetourMemberHarmonyPostfix(Type targetClass = DefaultTargetClass, string targetMember = DefaultTargetMemberName) : base(targetClass, targetMember) { }
+
+		public DetourMemberHarmonyPostfix(string targetMember) : this(DefaultTargetClass, targetMember) { }
+	}
+
+	public class DetourConstructorBase : Attribute
 	{
 		public Type TargetClass { get; }
-		public DetourConstructor(Type targetClass)
+
+		protected DetourConstructorBase(Type targetClass)
 		{
 			this.TargetClass = targetClass;
 		}
 	}
+	public class DetourConstructor : DetourConstructorBase
+	{
+		public DetourConstructor(Type targetClass) : base(targetClass) { }
+	}
+	[AttributeUsage(AttributeTargets.Method)]
+	public class DetourConstructorHarmonyPostfix : DetourConstructorBase
+	{
+		public DetourConstructorHarmonyPostfix(Type targetClass) : base(targetClass) { }
+	}
 
 	public class DetourPair
 	{
-		public Type sourceMethodTarget;
-		public MethodInfo sourceMethod;
-		public Type destinationMethodTarget;
-		public MethodInfo destinationMethod;
+		public readonly MethodBase sourceMethod;
+		public readonly MethodBase destinationMethod;
 
-		public DetourPair(Type sourceMethodTarget, MethodInfo sourceMethod, Type destinationMethodTarget, MethodInfo destinationMethod)
+		public DetourPair(MethodBase sourceMethod, MethodBase destinationMethod)
 		{
-			this.sourceMethodTarget = sourceMethodTarget;
 			this.sourceMethod = sourceMethod;
-			this.destinationMethodTarget = destinationMethodTarget;
 			this.destinationMethod = destinationMethod;
 		}
 
@@ -79,7 +91,7 @@ namespace ZhentarTweaks
 
 		private static void Inject()
 		{
-			var detourPairs = GetDetours(typeof(Detours).Assembly);
+			var detourPairs = GetDetours<DetourMember>(typeof(Detours).Assembly);
 
 			foreach (var detourPair in detourPairs)
 			{
@@ -90,31 +102,57 @@ namespace ZhentarTweaks
 			}
 			DoConstructorDetours();
 
+			var harmony = HarmonyInstance.Create("ZhentarTweaks");
+			harmony.PatchAll(typeof(Detours).Assembly);
+
+			foreach (var detourPair in GetDetours<DetourMemberHarmonyPostfix>(typeof(Detours).Assembly))
+			{
+				if (!(detourPair.destinationMethod is MethodInfo))
+				{
+					Log.Error("Harmony detour target must be a regular method");
+					continue;
+				}
+				harmony.Patch(detourPair.sourceMethod, null, new HarmonyMethod((MethodInfo)detourPair.destinationMethod));
+			}
+
+			foreach (var pair in GetConstructorDetours<DetourConstructorHarmonyPostfix>())
+			{
+				if (!(pair.destinationMethod is MethodInfo))
+				{
+					Log.Error("Harmony detour target must be a regular method");
+					continue;
+				}
+				harmony.Patch(pair.sourceMethod, null, new HarmonyMethod((MethodInfo)pair.destinationMethod));
+				Log.Message($"{pair.destinationMethod.DeclaringType.FullName} constructor patch applied");
+			}
 		}
 
 		private static void DoConstructorDetours()
 		{
-			var assembly = typeof(Detours).Assembly;
-			var toTypes = assembly
-				.GetTypes()
-				.Where(toType => (
-					toType.GetConstructors(UniversalBindingFlags).Concat<MethodBase>(toType.GetMethods(UniversalBindingFlags)).Any(c => c.HasAttribute<DetourConstructor>())));
+			foreach (var pair in GetConstructorDetours<DetourConstructor>())
+			{
+				if (!TryDetourFromToInt(pair.sourceMethod, pair.destinationMethod)) { Log.Error($"Constructor detour failed for {pair.destinationMethod.DeclaringType.FullName}"); }
+			}
+		}
+
+		private static IEnumerable<DetourPair> GetConstructorDetours<TAttribute>() where TAttribute : DetourConstructorBase
+		{
+			var toTypes = typeof(Detours).Assembly.GetTypes().Where(toType => toType.GetMembers(UniversalBindingFlags).Any(c => c.HasAttribute<TAttribute>()));
+
 			foreach (var type in toTypes)
 			{
-				foreach (var constructor in type.GetConstructors(UniversalBindingFlags).Concat<MethodBase>(type.GetMethods(UniversalBindingFlags)).Where(c => c.HasAttribute<DetourConstructor>()))
+				foreach (var constructor in type.GetMembers(UniversalBindingFlags).OfType<MethodBase>().Where(c => c.HasAttribute<TAttribute>()))
 				{
-					DetourConstructor detour;
-					constructor.TryGetAttribute<DetourConstructor>(out detour);
-					var destType = detour.TargetClass;
+					constructor.TryGetAttribute<TAttribute>(out var detour);
 
-					var targetConstructor = destType.GetConstructors(UniversalBindingFlags)
-						  .FirstOrDefault(ctor => (ctor.GetParameters().Select(checkParameter => checkParameter.ParameterType)
-														  .SequenceEqual(constructor.GetParameters()
-																						 .Skip(GetMethodType(constructor) == MethodType.Extension ? 1 : 0)
-																						 .Select(destinationParameter => destinationParameter.ParameterType)))
-							);
-
-					if (!TryDetourFromToInt(targetConstructor, constructor)) { Log.Error($"Constructor detour failed for {type.FullName}"); }
+					var targetConstructor = detour.TargetClass.GetConstructors(UniversalBindingFlags)
+							.FirstOrDefault(ctor => (ctor.GetParameters().Select(checkParameter => checkParameter.ParameterType)
+																			.SequenceEqual(constructor.GetParameters()
+																							.Skip(GetMethodType(constructor) == MethodType.Extension ? 1 : 0)
+																							.Where(p => !p.Name.StartsWith("__"))
+																							.Select(destinationParameter => destinationParameter.ParameterType))));
+					if (targetConstructor == null) { Log.Error($"{constructor.Name} constructor detour failed"); continue; }
+					yield return new DetourPair(targetConstructor, constructor);
 				}
 			}
 		}
@@ -124,62 +162,35 @@ namespace ZhentarTweaks
 		/// </summary>
 		/// <returns>The list of detours with matching sequence and timing</returns>
 		/// <param name="assembly">Assembly to get detours from</param>
-		/// <param name="sequence">Injection sequence</param>
-		/// <param name="timing">Injection timing</param>
-		public static List<DetourPair> GetDetours(Assembly assembly)
+		private static IEnumerable<DetourPair> GetDetours<TAttribute>(Assembly assembly) where TAttribute : DetourMemberBase
 		{
 			// Get only types which have methods and/or properties marked with either of the detour attributes
-			List<Type> toTypes = assembly
+			var toTypes = assembly
 				.GetTypes()
-				.Where(toType => (
-					(toType.GetMethods(UniversalBindingFlags).Any(toMethod => toMethod.HasAttribute<DetourMember>())) ||
-					(toType.GetProperties(UniversalBindingFlags).Any(toProperty => toProperty.HasAttribute<DetourMember>()))
-				))
-				.ToList();
-
-			// No types are detouring, return null
-			if (toTypes.NullOrEmpty())
-			{
-				return null;
-			}
-
-			// Create return list for the detours
-			var detours = new List<DetourPair>();
+				.Where(toType => toType.GetMembers(UniversalBindingFlags).Any(toMethod => toMethod.HasAttribute<TAttribute>()));
 
 			// Process the types and fetch their detours
 			foreach (var toType in toTypes)
 			{
-				// Get the raw methods
-				GetDetouredMethods(ref detours, toType);
-				// Get the cloaked methods (properties)
-				GetDetouredProperties(ref detours, toType);
+				foreach (var detour in GetDetouredMethods<TAttribute>(toType).Concat(GetDetouredProperties<TAttribute>(toType)))
+				{
+					yield return detour;
+				}
 			}
-
-			// Return the list for this sequence and timing
-			return detours;
 		}
 
 		/// <summary>
 		/// Returns a list of detour methods with matching sequence and timing from a class.
 		/// </summary>
-		/// <param name="detours">List to add the detours from this class to</param>
 		/// <param name="destinationType">The class to check for detour methods</param>
-		/// <param name="sequence">Injection sequence</param>
-		/// <param name="timing">Injection timing</param>
-		private static void GetDetouredMethods(ref List<DetourPair> detours, Type destinationType)
+		private static IEnumerable<DetourPair> GetDetouredMethods<TAttribute>(Type destinationType) where TAttribute : DetourMemberBase
 		{
 			var destinationMethods = destinationType
 				.GetMethods(UniversalBindingFlags)
-				.Where(destinationMethod => destinationMethod.HasAttribute<DetourMember>())
-				.ToList();
-			if (destinationMethods.NullOrEmpty())
-			{   // No methods to detour
-				return;
-			}
+				.Where(destinationMethod => destinationMethod.HasAttribute<TAttribute>());
 			foreach (var destinationMethod in destinationMethods)
 			{
-				DetourMember attribute = null;
-				if (destinationMethod.TryGetAttribute(out attribute))
+				if (destinationMethod.TryGetAttribute<TAttribute>(out var attribute))
 				{
 					var memberClass = GetDetourTargetClass(destinationMethod, attribute);
 					if (memberClass == null)
@@ -194,7 +205,7 @@ namespace ZhentarTweaks
 						continue;
 					}
 					// Add detour for method
-					detours.Add(new DetourPair(GetMethodTargetClass(sourceMethod, null), sourceMethod, GetMethodTargetClass(destinationMethod, attribute), destinationMethod));
+					yield return new DetourPair(sourceMethod, destinationMethod);
 				}
 			}
 		}
@@ -202,35 +213,26 @@ namespace ZhentarTweaks
 		/// <summary>
 		/// Returns a list of detour property methods (get/set) with matching sequence and timing from a class.
 		/// </summary>
-		/// <param name="detours">List to add the detours from this class to</param>
 		/// <param name="destinationType">The class to check for detour properties</param>
-		/// <param name="sequence">Injection sequence</param>
-		/// <param name="timing">Injection timing</param>
-		private static void GetDetouredProperties(ref List<DetourPair> detours, Type destinationType)
+		private static IEnumerable<DetourPair> GetDetouredProperties<TAttribute>(Type destinationType) where TAttribute : DetourMemberBase
 		{
 			var destinationProperties = destinationType
 				.GetProperties(UniversalBindingFlags)
-				.Where(destinationProperty => destinationProperty.HasAttribute<DetourMember>())
-				.ToList();
-			if (destinationProperties.NullOrEmpty())
-			{   // No properties to detour
-				return;
-			}
+				.Where(destinationProperty => destinationProperty.HasAttribute<TAttribute>());
 			foreach (var destinationProperty in destinationProperties)
 			{
-				DetourMember attribute = null;
-				if (destinationProperty.TryGetAttribute(out attribute))
+				if (destinationProperty.TryGetAttribute<TAttribute>(out var attribute))
 				{
 					var memberClass = GetDetourTargetClass(destinationProperty, attribute);
 					if (memberClass == null)
 					{   // Report and ignore any missing classes
-						Log.Error(string.Format("MemberClass '{2}' resolved to null for '{0}.{1}'", destinationType.FullName, destinationProperty.Name, FullNameOfType(attribute.targetClass)));
+						Log.Error($"MemberClass '{FullNameOfType(attribute.targetClass)}' resolved to null for '{destinationType.FullName}.{destinationProperty.Name}'");
 						continue;
 					}
 					var sourceProperty = GetDetouredPropertyInt(memberClass, attribute.targetMember, destinationProperty);
 					if (sourceProperty == null)
 					{   // Report and ignore any missing properties
-						Log.Error(string.Format("TargetMember '{2}.{3}' resolved to null for '{0}.{1}'", destinationType.FullName, destinationProperty.Name, memberClass.FullName, attribute.targetMember));
+						Log.Error($"TargetMember '{memberClass.FullName}.{attribute.targetMember}' resolved to null for '{destinationType.FullName}.{destinationProperty.Name}'");
 						continue;
 					}
 					var destinationMethod = destinationProperty.GetGetMethod(true);
@@ -239,11 +241,11 @@ namespace ZhentarTweaks
 						var sourceMethod = sourceProperty.GetGetMethod(true);
 						if (sourceMethod == null)
 						{   // Report and ignore missing get method
-							Log.Error(string.Format("TargetMember '{2}.{3}' has no get method for '{0}.{1}'", destinationType.FullName, destinationProperty.Name, memberClass.FullName, attribute.targetMember));
+							Log.Error($"TargetMember '{memberClass.FullName}.{attribute.targetMember}' has no get method for '{destinationType.FullName}.{destinationProperty.Name}'");
 						}
 						else
 						{   // Add detour for get method
-							detours.Add(new DetourPair(GetMethodTargetClass(sourceMethod, null), sourceMethod, GetMethodTargetClass(destinationMethod, attribute), destinationMethod));
+							yield return new DetourPair(sourceMethod, destinationMethod);
 						}
 					}
 					destinationMethod = destinationProperty.GetSetMethod(true);
@@ -256,7 +258,7 @@ namespace ZhentarTweaks
 						}
 						else
 						{   // Add detour for set method
-							detours.Add(new DetourPair(GetMethodTargetClass(sourceMethod, null), sourceMethod, GetMethodTargetClass(destinationMethod, attribute), destinationMethod));
+							yield return new DetourPair(sourceMethod, destinationMethod);
 						}
 					}
 				}
@@ -272,7 +274,7 @@ namespace ZhentarTweaks
 		/// <param name="destinationMethod">MethodInfo of the detour</param>
 		private static MethodInfo GetDetouredMethodInt(Type sourceClass, string sourceMember, MethodInfo destinationMethod)
 		{
-			if (sourceMember == DetourMember.DefaultTargetMemberName)
+			if (sourceMember == DetourMemberBase.DefaultTargetMemberName)
 			{
 				sourceMember = destinationMethod.Name;
 			}
@@ -286,18 +288,16 @@ namespace ZhentarTweaks
 				sourceMethod = sourceClass.GetMethods(UniversalBindingFlags)
 										  .FirstOrDefault(checkMethod => (
 											 (checkMethod.Name == sourceMember) &&
-											 (checkMethod.ReturnType == destinationMethod.ReturnType) &&
+											 (checkMethod.ReturnType == destinationMethod.ReturnType || destinationMethod.GetParameters().Any(p => p.Name == "__result")) &&
 											 (checkMethod.GetParameters().Select(checkParameter => checkParameter.ParameterType)
 																	 	 .SequenceEqual(destinationMethod.GetParameters()
 																										 .Skip(GetMethodType(destinationMethod) == MethodType.Extension ? 1 : 0)
+																										 .Where(p => !p.Name.StartsWith("__"))
 																										 .Select(destinationParameter => destinationParameter.ParameterType)))
 											));
 			}
 			var fixedName = GetFixedMemberName(sourceMember);
-			if (
-				(sourceMethod == null) &&
-				(sourceMember != fixedName)
-			)
+			if ( (sourceMethod == null) && (sourceMember != fixedName) )
 			{
 				return GetDetouredMethodInt(sourceClass, fixedName, destinationMethod);
 			}
@@ -313,15 +313,13 @@ namespace ZhentarTweaks
 		/// <param name="destinationProperty">PropertyInfo of the detour</param>
 		private static PropertyInfo GetDetouredPropertyInt(Type sourceClass, string sourceMember, PropertyInfo destinationProperty)
 		{
-			if (sourceMember == DetourMember.DefaultTargetMemberName)
+			if (sourceMember == DetourMemberBase.DefaultTargetMemberName)
 			{
 				sourceMember = destinationProperty.Name;
 			}
 			var sourceProperty = sourceClass.GetProperty(sourceMember, UniversalBindingFlags);
 			var fixedName = GetFixedMemberName(sourceMember);
-			if (
-				(sourceProperty == null) &&
-				(sourceMember != fixedName)
+			if ( (sourceProperty == null) && (sourceMember != fixedName)
 			)
 			{
 				return GetDetouredPropertyInt(sourceClass, fixedName, destinationProperty);
@@ -329,7 +327,7 @@ namespace ZhentarTweaks
 			return sourceProperty;
 		}
 
-		public static bool TryDetourFromTo(MethodInfo sourceMethod, MethodInfo destinationMethod)
+		public static bool TryDetourFromTo(MethodBase sourceMethod, MethodBase destinationMethod)
 		{
 			// Error out on null arguments
 			if (sourceMethod == null)
@@ -346,21 +344,20 @@ namespace ZhentarTweaks
 
 			// Used for deeper method checks to return failure string
 			var reason = string.Empty;
+			
+			// Make sure the class containing the detour doesn't contain instance fields
+			if (!DetourContainerClassIsFieldSafe(destinationMethod.DeclaringType))
+			{
+				Log.Error($"'{FullNameOfType(destinationMethod.DeclaringType)}' contains fields which are not static!  Detours can not be defined in classes which have instance fields!");
+				return false;
+			}
 
-			//Commenting out your safety checks! Always a sign you're on the right track!
-			//// Make sure the class containing the detour doesn't contain instance fields
-			//if (!DetourContainerClassIsFieldSafe(destinationMethod.DeclaringType))
-			//{
-			//	Log.Error(string.Format("'{0}' contains fields which are not static!  Detours can not be defined in classes which have instance fields!", FullNameOfType(destinationMethod.DeclaringType)));
-			//	return false;
-			//}
-
-			//// Make sure the two methods are call compatible
-			//if (!MethodsAreCallCompatible(GetMethodTargetClass(sourceMethod), sourceMethod, GetMethodTargetClass(destinationMethod), destinationMethod, out reason))
-			//{
-			//	Log.Error(string.Format("Methods are not call compatible when trying to detour '{0}' to '{1}' :: {2}", FullMethodName(sourceMethod), FullMethodName(destinationMethod), reason));
-			//	return false;
-			//}
+			// Make sure the two methods are call compatible
+			if (!MethodsAreCallCompatible(GetMethodTargetClass(sourceMethod), sourceMethod, GetMethodTargetClass(destinationMethod), destinationMethod, out reason))
+			{
+				Log.Error($"Methods are not call compatible when trying to detour '{FullMethodName(sourceMethod)}' to '{FullMethodName(destinationMethod)}' :: {reason}");
+				return false;
+			}
 
 			// Method is now detoured, we are doneski!
 			return TryDetourFromToInt(sourceMethod, destinationMethod);
@@ -374,11 +371,6 @@ namespace ZhentarTweaks
 		**/
 		public static unsafe bool TryDetourFromToInt(MethodBase source, MethodBase destination)
 		{
-
-			// keep track of detours and spit out some messaging
-			string sourceString = source.DeclaringType.FullName + "." + source.Name + " @ 0x" + source.MethodHandle.GetFunctionPointer().ToString("X" + (IntPtr.Size * 2).ToString());
-			string destinationString = destination.DeclaringType.FullName + "." + destination.Name + " @ 0x" + destination.MethodHandle.GetFunctionPointer().ToString("X" + (IntPtr.Size * 2).ToString());
-
 			if (IntPtr.Size == sizeof(Int64))
 			{
 				// 64-bit systems use 64-bit absolute address and jumps
@@ -452,12 +444,12 @@ namespace ZhentarTweaks
 		/// <returns>Full class and name</returns>
 		/// <param name="methodInfo">MethodInfo of method</param>
 		/// <param name="withAddress">Optional bool flag to add the address</param>
-		private static string FullMethodName(MethodInfo methodInfo, bool withAddress = false)
+		private static string FullMethodName(MethodBase methodInfo, bool withAddress = false)
 		{
-			var rVal = methodInfo.DeclaringType.FullName + "." + methodInfo.Name;
+			var rVal = $"{methodInfo.DeclaringType.FullName}.{methodInfo.Name}";
 			if (withAddress)
 			{
-				rVal += " @ 0x" + methodInfo.MethodHandle.GetFunctionPointer().ToString("X" + (IntPtr.Size * 2).ToString());
+				rVal += $" @ 0x{methodInfo.MethodHandle.GetFunctionPointer().ToString("X" + (IntPtr.Size * 2))}";
 			}
 			return rVal;
 		}
@@ -519,7 +511,7 @@ namespace ZhentarTweaks
 		/// <returns>The method target class</returns>
 		/// <param name="info">MethodInfo of the method to check</param>
 		/// <param name="attribute">DetourMember attribute</param>
-		private static Type GetMethodTargetClass(MethodInfo info, DetourMember attribute = null)
+		private static Type GetMethodTargetClass(MethodBase info, DetourMemberBase attribute = null)
 		{
 			var methodType = GetMethodType(info);
 
@@ -538,7 +530,7 @@ namespace ZhentarTweaks
 			}
 			if (attribute != null)
 			{
-				if (attribute.targetClass != DetourMember.DefaultTargetClass)
+				if (attribute.targetClass != DetourMemberBase.DefaultTargetClass)
 				{
 					return attribute.targetClass;
 				}
@@ -554,17 +546,17 @@ namespace ZhentarTweaks
 		/// <returns>The detour target class</returns>
 		/// <param name="info">MemberInfo of the member to check</param>
 		/// <param name="attribute">DetourMember attribute</param>
-		private static Type GetDetourTargetClass(MemberInfo info, DetourMember attribute)
+		private static Type GetDetourTargetClass(MemberInfo info, DetourMemberBase attribute)
 		{
 			if (attribute != null)
 			{
-				if (attribute.targetClass != DetourMember.DefaultTargetClass)
+				if (attribute.targetClass != DetourMemberBase.DefaultTargetClass)
 				{
 					return attribute.targetClass;
 				}
 				var methodInfo = info as MethodInfo;
 				if (
-					(info.DeclaringType.BaseType == typeof(System.Object)) &&
+					(info.DeclaringType.BaseType == typeof(Object)) &&
 					(methodInfo != null) &&
 					(GetMethodType(methodInfo) == MethodType.Extension)
 				)
@@ -590,7 +582,7 @@ namespace ZhentarTweaks
 				return true;
 			}
 
-			var baseFields = (detourContainerClass.BaseType?.GetFields(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic).Where(f => !f.IsPrivate).Select(finfo => finfo.Name) ?? Enumerable.Empty<string>()).ToArray();
+			var baseFields = (detourContainerClass.BaseType?.GetFields(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic).Where(f => !f.IsPrivate).Select(f => f.Name) ?? Enumerable.Empty<string>()).ToArray();
 			//Make sure all instance fields were inherited from the parent class
 			return fields.All(f => baseFields.Contains(f.Name));
 		}
@@ -608,28 +600,16 @@ namespace ZhentarTweaks
 		/// <param name="reason">Return string with reason for failure</param>
 		private static bool DetourTargetsAreValid(Type targetA, MethodType typeA, string nameA, Type targetB, MethodType typeB, string nameB, out string reason)
 		{
-			if (
-				(typeA == MethodType.Instance) ||
-				(typeA == MethodType.Extension)
-			)
+			if ((typeA == MethodType.Instance) || (typeA == MethodType.Extension))
 			{
 				if (typeB == MethodType.Static)
 				{
-					reason = string.Format(
-						"'{0}' is static but not an extension method",
-						nameB
-					);
+					reason = $"'{nameB}' is static but not an extension method";
 					return false;
 				}
-				else if (targetA != targetB)
+				if (targetA != targetB)
 				{
-					reason = string.Format(
-						"Target classes do not match :: '{0}' target is '{1}'; '{2}' target is '{3}'",
-						nameA,
-						FullNameOfType(targetA),
-						nameB,
-						FullNameOfType(targetB)
-					);
+					reason = $"Target classes do not match :: '{nameA}' target is '{FullNameOfType(targetA)}'; '{nameB}' target is '{FullNameOfType(targetB)}'";
 					return false;
 				}
 			}
@@ -647,15 +627,15 @@ namespace ZhentarTweaks
 		/// <param name="destinationTargetClass">Destination method target class</param>
 		/// <param name="destinationMethod">Destination method</param>
 		/// <param name="reason">Return string with reason for failure</param>
-		private static bool MethodsAreCallCompatible(Type sourceTargetClass, MethodInfo sourceMethod, Type destinationTargetClass, MethodInfo destinationMethod, out string reason)
+		private static bool MethodsAreCallCompatible(Type sourceTargetClass, MethodBase sourceMethod, Type destinationTargetClass, MethodBase destinationMethod, out string reason)
 		{
 			reason = string.Empty;
-			if (sourceMethod.ReturnType != destinationMethod.ReturnType)
+			if (((sourceMethod as MethodInfo)?.ReturnType ?? typeof(void)) != ((destinationMethod as MethodInfo)?.ReturnType ?? typeof(void)))
 			{   // Return types don't match
 				reason = string.Format(
 					"Return type mismatch :: Source={1}, Destination={0}",
-					sourceMethod.ReturnType.Name,
-					destinationMethod.ReturnType.Name
+					((sourceMethod as MethodInfo)?.ReturnType ?? typeof(void)).Name,
+					((destinationMethod as MethodInfo)?.ReturnType ?? typeof(void)).Name
 				);
 				return false;
 			}
