@@ -44,7 +44,23 @@ namespace ZhentarTweaks
 			var compiled = (Func<object, TValue>)lambda.Compile();
 			return compiled;
 		}
+		
+		public static Action<TObject, TArgs1, TArgs2, TArgs3> GetMethodInvoker<TObject, TArgs1, TArgs2, TArgs3>(string methodName)
+		{
+			var methodInfo = typeof(TObject).GetMethod(methodName, Detours.UniversalBindingFlags, null, new[] { typeof(TArgs1), typeof(TArgs2), typeof(TArgs3) }, null);
 
+			var param = Expression.Parameter(typeof(TObject), "thisArg");
+
+			var argParams = new[]
+				{ Expression.Parameter(typeof(TArgs1), "arg1"), Expression.Parameter(typeof(TArgs2), "arg2"), Expression.Parameter(typeof(TArgs3), "arg3")};
+
+			var call = Expression.Call(param, methodInfo, argParams);
+
+			var lambda = Expression.Lambda(typeof(Action<TObject, TArgs1, TArgs2, TArgs3>), call, param, argParams[0], argParams[1], argParams[2]);
+			var compiled = (Action<TObject, TArgs1, TArgs2, TArgs3>)lambda.Compile();
+			return compiled;
+		}
+		
 		public static Action<TObject, TArgs1, TArgs2> GetMethodInvoker<TObject, TArgs1, TArgs2>(string methodName)
 		{
 			var methodInfo = typeof(TObject).GetMethod(methodName, Detours.UniversalBindingFlags, null, new[] { typeof(TArgs1), typeof(TArgs2) }, null);

@@ -320,4 +320,57 @@ namespace ZhentarTweaks
 			return Color.Lerp(ColorInfertile, ColorFertile, num);
 		}
 	}
+
+
+	public static class Designator_PlaceDetour
+	{
+		[DetourMember]
+		public static void SelectedUpdate(this Designator_Place @this)
+		{
+			GenDraw.DrawNoBuildEdgeLines();
+			if (!ArchitectCategoryTab.InfoRect.Contains(UI.MousePositionOnUIInverted))
+			{
+				IntVec3 intVec = UI.MouseCell();
+				if (@this.PlacingDef is TerrainDef)
+				{
+					GenUI.RenderMouseoverBracket();
+					return;
+				}
+				Color ghostCol;
+				if (@this.CanDesignateCell(intVec).Accepted)
+				{
+					ghostCol = new Color(0.5f, 1f, 0.6f, 0.4f);
+				}
+				else
+				{
+					ghostCol = new Color(1f, 0f, 0f, 0.4f);
+				}
+				DrawGhost(@this, ghostCol);
+				if (@this.CanDesignateCell(intVec).Accepted && @this.PlacingDef.specialDisplayRadius > 0.01f)
+				{
+					GenDraw.DrawRadiusRing(UI.MouseCell(), @this.PlacingDef.specialDisplayRadius);
+					if ((@this.PlacingDef as ThingDef)?.building?.turretGunDef?.Verbs?.FirstOrDefault()?.requireLineOfSight == true)
+					{
+						var map = Find.VisibleMap;
+						float range = ((ThingDef) @this.PlacingDef).building.turretGunDef.Verbs[0].range;
+						foreach (var cell in GenRadial.RadialCellsAround(intVec, range, false))
+						{
+							if (GenSight.LineOfSight(intVec, cell,  map, true) != GenSight.LineOfSight(cell, intVec, map, true)) { CellRenderer.RenderCell(cell, 0f); }
+							if (GenSight.LineOfSight(intVec, cell, map, true))
+							{
+								CellRenderer.RenderCell(cell, 0.6f);
+								continue;
+							}
+							
+						}
+					}
+				}
+				GenDraw.DrawInteractionCell((ThingDef)@this.PlacingDef, intVec, placingRotGet(@this));
+			}
+		}
+
+		private static readonly Action<Designator_Place, Color> DrawGhost = Utils.GetMethodInvoker<Designator_Place, Color>("DrawGhost");
+
+		private static readonly Func<Designator_Place, Rot4> placingRotGet = Utils.GetFieldAccessor<Designator_Place, Rot4>("placingRot");
+	}
 }
