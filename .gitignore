@@ -242,3 +242,5 @@ ModelManifest.xml
 .fake/
 /Assemblies/*.dll
 /ZhentarTweaks.csproj.DotSettings
+/0Harmony.dll
+/0Harmony.dll

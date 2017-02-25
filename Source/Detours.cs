@@ -123,7 +123,6 @@ namespace ZhentarTweaks
 					continue;
 				}
 				harmony.Patch(pair.sourceMethod, null, new HarmonyMethod((MethodInfo)pair.destinationMethod));
-				Log.Message($"{pair.destinationMethod.DeclaringType.FullName} constructor patch applied");
 			}
 		}
 

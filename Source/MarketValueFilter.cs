@@ -55,15 +55,13 @@ namespace ZhentarTweaks
 		[DetourMemberHarmonyPostfix] //Yup, not virtual again
 		public static void Allows(MarketValueFilter __instance, ref bool __result, Thing t)
 		{
-			if (__instance.GetType() == typeof(MarketValueFilter))
+			if (__result && __instance.GetType() == typeof(MarketValueFilter))
 			{
 				if (!__instance.allowedMarketValue.IncludesEpsilon(t.GetInnerIfMinified().MarketValue))
 				{
 					__result = false;
 				}
 			}
-
-			__result = true;
 		}
 	}
 }
