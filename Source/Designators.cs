@@ -208,26 +208,14 @@ namespace ZhentarTweaks
 		public new bool CanMakeNewAllowed(AllowedAreaMode mode) => true;
 	}
 
-	
-	[StaticConstructorOnStartup]
 	public class SunLampPlanDesignatorAdd : Designator
 	{
-		static SunLampPlanDesignatorAdd()
-		{
-			var resolvedDesignatorGetter = Utils.GetFieldAccessor<DesignationCategoryDef, List<Designator>>("resolvedDesignators");
-			var orders = DefDatabase<DesignationCategoryDef>.AllDefs.FirstOrDefault(def => def.defName == "Orders");
-			resolvedDesignatorGetter(orders).Add(new SunLampPlanDesignatorAdd());
-			orders.specialDesignatorClasses.Add(typeof(SunLampPlanDesignatorAdd));
-		}
-
-		private readonly DesignationDef desDef = DesignationDefOf.Plan;
-
+		
 		public SunLampPlanDesignatorAdd()
 		{
 			this.soundDragSustain = SoundDefOf.DesignateDragStandard;
 			this.soundDragChanged = SoundDefOf.DesignateDragStandardChanged;
 			this.useMouseIcon = true;
-			this.desDef = DesignationDefOf.Plan;
 			this.defaultLabel = "Sun Lamp Plan";
 			this.defaultDesc = "Place planning designations in the shape of a sun lamp radius";
 			this.icon = ContentFinder<Texture2D>.Get("UI/Designators/PlanOn");
@@ -250,11 +238,12 @@ namespace ZhentarTweaks
 
 		public override void DesignateSingleCell(IntVec3 c)
 		{
+			var desDef = DesignationDefOf.Plan;
 			foreach (var cell in GenRadial.RadialCellsAround(c, 5.8f, true))
 			{
-				if (Map.designationManager.DesignationAt(cell, this.desDef) == null)
+				if (Map.designationManager.DesignationAt(cell, desDef) == null)
 				{
-					Map.designationManager.AddDesignation(new Designation(new LocalTargetInfo(cell), this.desDef));
+					Map.designationManager.AddDesignation(new Designation(new LocalTargetInfo(cell), desDef));
 				}
 			}
 		}

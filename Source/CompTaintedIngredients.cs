@@ -14,13 +14,13 @@ namespace ZhentarTweaks
 		{
 			if (ContainsHumanlikeMeat || ContainsInsectMeat)
 			{
-				parent.Map.overlayDrawer.DrawOverlay(parent, OverlayDrawerDetour.SentinalOverlayType);
+				parent.Map.overlayDrawer.DrawOverlay(parent, OverlayDrawerDetour.SentinelOverlayType);
 			}
 		}
 
-		public bool ContainsHumanlikeMeat => ingredients.Any(FoodUtility.IsHumanlikeMeat);
+		public bool ContainsHumanlikeMeat => ingredients?.Any(FoodUtility.IsHumanlikeMeat) ?? false;
 
-		public bool ContainsInsectMeat => ingredients.Any(td => td.ingestible.specialThoughtAsIngredient == ThoughtDefOf.AteInsectMeatAsIngredient);
+		public bool ContainsInsectMeat => ingredients?.Any(td => td.ingestible.specialThoughtAsIngredient == ThoughtDefOf.AteInsectMeatAsIngredient) ?? false;
 	}
 
 	[StaticConstructorOnStartup]
@@ -52,7 +52,7 @@ namespace ZhentarTweaks
 	[StaticConstructorOnStartup]
 	public class OverlayDrawerDetour : OverlayDrawer
 	{
-		public const OverlayTypes SentinalOverlayType = OverlayTypes.ForbiddenBig;
+		public const OverlayTypes SentinelOverlayType = OverlayTypes.ForbiddenBig;
 
 		private static readonly float BaseAlt;
 
