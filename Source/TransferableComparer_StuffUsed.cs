@@ -9,12 +9,12 @@ namespace ZhentarTweaks
 {
 	class TransferableComparer_StuffUsed : TransferableComparer
 	{
-		public override int Compare(ITransferable lhs, ITransferable rhs)
+		public override int Compare(Transferable lhs, Transferable rhs)
 		{
 			return GetValueFor(lhs).CompareTo(GetValueFor(rhs));
 		}
 
-		private string GetValueFor(ITransferable t)
+		private string GetValueFor(Transferable t)
 		{
 			Thing anyThing = t.AnyThing;
 

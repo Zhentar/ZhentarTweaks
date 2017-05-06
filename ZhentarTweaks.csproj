@@ -62,7 +62,6 @@
     <Compile Include="Source\MarketValueFilter.cs" />
     <Compile Include="Source\MarketValueFilterInjector.cs" />
     <Compile Include="Source\MarketValueThingFilterUI.cs" />
-    <Compile Include="Source\RoofGrid.cs" />
     <Compile Include="Source\Designators.cs" />
     <Compile Include="Source\Detours.cs" />
     <Compile Include="Source\Properties\AssemblyInfo.cs" />

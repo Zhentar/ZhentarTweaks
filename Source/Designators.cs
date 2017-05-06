@@ -205,7 +205,7 @@ namespace ZhentarTweaks
 		{ }
 
 		[DetourMember]
-		public bool CanMakeNewAllowed(AllowedAreaMode mode) => true;
+		public new bool CanMakeNewAllowed(AllowedAreaMode mode) => true;
 	}
 
 	

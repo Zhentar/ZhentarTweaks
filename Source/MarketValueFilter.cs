@@ -13,8 +13,6 @@ namespace ZhentarTweaks
 	class MarketValueFilter : ThingFilter
 	{
 		private static readonly Func<ThingFilter, Action> settingsChangedCallbackGet = Utils.GetFieldAccessor<ThingFilter, Action>("settingsChangedCallback");
-		private static readonly FieldInfo settingsChangedCallbackInfo = typeof(ThingFilter).GetField("settingsChangedCallback", BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.GetField);
-		private Action settingsChangedCallback { get { return settingsChangedCallbackGet(this); } set { settingsChangedCallbackInfo.SetValue(this, value); } }
 
 		private FloatRange allowedMarketValue = new FloatRange(0, float.MaxValue);
 
@@ -25,43 +23,27 @@ namespace ZhentarTweaks
 		} 
 
 		public MarketValueFilter() { }
+		
+		public MarketValueFilter(ThingFilter oldFilter) : base(settingsChangedCallbackGet(oldFilter)) { }
 
-		public MarketValueFilter(Action callback) : base(callback) { }
-
-		public MarketValueFilter(ThingFilter oldFilter)
+		public override void ExposeData()
 		{
-			this.settingsChangedCallback = settingsChangedCallbackGet(oldFilter);
+			base.ExposeData();
+			Scribe_Values.Look(ref allowedMarketValue, "allowedMarketValue");
 		}
 
-		[DetourMemberHarmonyPostfix] //It's not virtual so I can't just implement an override
-		public static void ExposeData(MarketValueFilter __instance)
+		public override void CopyAllowancesFrom(ThingFilter other)
 		{
-			if (__instance.GetType() == typeof(MarketValueFilter))
+			base.CopyAllowancesFrom(other);
+			if (other is MarketValueFilter)
 			{
-				Scribe_Values.LookValue(ref __instance.allowedMarketValue, "allowedMarketValue");
+				allowedMarketValue = ((MarketValueFilter) other).allowedMarketValue;
 			}
 		}
-
-		[DetourMemberHarmonyPostfix] //Also not virtual
-		public static void CopyAllowancesFrom(MarketValueFilter __instance, ThingFilter other)
+		
+		public override bool Allows(Thing t)
 		{
-			//Gotta make sure we aren't reading or writing unallocated memory
-			if (other.GetType() == __instance.GetType() && __instance.GetType() == typeof(MarketValueFilter))
-			{
-				__instance.allowedMarketValue = ((MarketValueFilter)other).allowedMarketValue;
-			}
-		}
-
-		[DetourMemberHarmonyPostfix] //Yup, not virtual again
-		public static void Allows(MarketValueFilter __instance, ref bool __result, Thing t)
-		{
-			if (__result && __instance.GetType() == typeof(MarketValueFilter))
-			{
-				if (!__instance.allowedMarketValue.IncludesEpsilon(t.GetInnerIfMinified().MarketValue))
-				{
-					__result = false;
-				}
-			}
+			return allowedMarketValue.IncludesEpsilon(t.GetInnerIfMinified().MarketValue) && base.Allows(t);
 		}
 	}
 }

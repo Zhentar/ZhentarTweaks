@@ -16,7 +16,7 @@ namespace ZhentarTweaks
 		private static float viewHeight;
 
 		[DetourMember(typeof(ThingFilterUI))]
-		public static void DoThingFilterConfigWindow(Rect rect, ref Vector2 scrollPosition, ThingFilter filter, ThingFilter parentFilter = null, int openMask = 1, IEnumerable<ThingDef> forceHiddenDefs = null, IEnumerable<SpecialThingFilterDef> forceHiddenFilters = null)
+		public static void DoThingFilterConfigWindow(Rect rect, ref Vector2 scrollPosition, ThingFilter filter, ThingFilter parentFilter = null, int openMask = 1, IEnumerable<ThingDef> forceHiddenDefs = null, IEnumerable<SpecialThingFilterDef> forceHiddenFilters = null, List<ThingDef> suppressSmallVolumeTags = null)
 		{
 			Widgets.DrawMenuSection(rect);
 			Text.Font = GameFont.Tiny;
@@ -26,7 +26,7 @@ namespace ZhentarTweaks
 			{
 				filter.SetDisallowAll(forceHiddenDefs, forceHiddenFilters);
 			}
-			Rect rect3 = new Rect(rect2.xMax + 1f, rect2.y, num / 2f, 24f);
+			Rect rect3 = new Rect(rect2.xMax + 1f, rect2.y, rect.xMax - 1f - (rect2.xMax + 1f), 24f);
 			if (Widgets.ButtonText(rect3, "AllowAll".Translate()))
 			{
 				filter.SetAllowAll(parentFilter);
@@ -41,14 +41,11 @@ namespace ZhentarTweaks
 			DrawMarketValueFilterConfig(ref num2, viewRect.width, filter);
 			float num3 = num2;
 			Rect rect4 = new Rect(0f, num2, viewRect.width, 9999f);
-			Listing_TreeThingFilter listing_TreeThingFilter = new Listing_TreeThingFilter(rect4, filter, parentFilter, forceHiddenDefs, forceHiddenFilters);
+			Listing_TreeThingFilter listing_TreeThingFilter = new Listing_TreeThingFilter(filter, parentFilter, forceHiddenDefs, forceHiddenFilters, suppressSmallVolumeTags);
+			listing_TreeThingFilter.Begin(rect4);
 			TreeNode_ThingCategory node = ThingCategoryNodeDatabase.RootNode;
 			if (parentFilter != null)
 			{
-				if (parentFilter.DisplayRootCategory == null)
-				{
-					parentFilter.RecalculateDisplayRootCategory();
-				}
 				node = parentFilter.DisplayRootCategory;
 			}
 			listing_TreeThingFilter.DoCategoryChildren(node, 0, openMask, true);
