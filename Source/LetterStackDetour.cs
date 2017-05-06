@@ -11,27 +11,6 @@ namespace ZhentarTweaks
 {
 	static class LetterStackDetour
 	{
-		//static LetterStackDetour()
-		//{
-		//	try
-		//	{	//Need a wrapper method/lambda to be able to catch the TypeLoadException when HugsLib isn't present
-		//		((Action)(() =>
-		//		{
-		//			var settings = HugsLibController.Instance.Settings.GetModSettings("ZhentarTweaks");
-		//			//handle can't be saved as a SettingHandle<> type; otherwise the compiler generated closure class will throw a typeloadexception
-		//			object handle = settings.GetHandle("yellowLetterPause", "Pause on yellow letters",
-		//				"When the RimWorld Pause on urgent letters setting is set, also pause on yellow letters?", true);
-		//			DoNonUrgentPause = () => (SettingHandle<bool>)handle;
-		//		}))();
-		//		return;
-		//	}
-		//	catch (TypeLoadException)
-		//	{ }
-		//	DoNonUrgentPause = () => true;
-		//}
-		//
-		//private static Func<bool> DoNonUrgentPause;
-
 		private class TweaksMod : Mod
 		{
 			public TweaksMod(ModContentPack content) : base(content)
