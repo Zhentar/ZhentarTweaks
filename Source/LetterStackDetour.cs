@@ -18,10 +18,7 @@ namespace ZhentarTweaks
 				LetterStackDetour.settings = GetSettings<TweaksSettings>();
 			}
 
-			public override string SettingsCategory()
-			{
-				return "Zhentar's Vanilla Tweaks";
-			}
+			public override string SettingsCategory() => "Zhentar's Vanilla Tweaks";
 
 			public override void DoSettingsWindowContents(Rect inRect)
 			{
@@ -33,12 +30,7 @@ namespace ZhentarTweaks
 				listing_Standard.End();
 			}
 		}
-
-		private static TweaksSettings settings;
-
-		private static Func<bool> DoNonUrgentPause = () => settings.DoNonUrgentPause;
-
-
+		
 		private class TweaksSettings : ModSettings
 		{
 			public bool DoNonUrgentPause = false;
@@ -49,22 +41,25 @@ namespace ZhentarTweaks
 			}
 		}
 
+		private static TweaksSettings settings;
+
 		private static readonly Func<LetterStack, List<Letter>> lettersGet = Utils.GetFieldAccessor<LetterStack, List<Letter>>("letters");
 		
 		[DetourMember]
-		public static void ReceiveLetter(this LetterStack @this, Letter let, string debugText = null)
+		public static void ReceiveLetter(this LetterStack @this, Letter let, string debugInfo = null)
 		{
-			var soundDef = let.def == LetterDefOf.BadUrgent ? SoundDefOf.LetterArriveBadUrgent : SoundDefOf.LetterArrive;
-			soundDef.PlayOneShotOnCamera();
+			let.def.arriveSound.PlayOneShotOnCamera();
 			if (Prefs.PauseOnUrgentLetter && !Find.TickManager.Paused)
 			{
-				if (let.def == LetterDefOf.BadUrgent || (let.def == LetterDefOf.BadNonUrgent && DoNonUrgentPause()) )
+				if (let.def == LetterDefOf.BadUrgent || (let.def == LetterDefOf.BadNonUrgent && settings.DoNonUrgentPause) )
 				{
 					Find.TickManager.TogglePaused();
 				}
 			}
 			lettersGet(@this).Add(let);
 			let.arrivalTime = Time.time;
+			let.debugInfo = debugInfo;
+			let.Received();
 		}
 	}
 }
