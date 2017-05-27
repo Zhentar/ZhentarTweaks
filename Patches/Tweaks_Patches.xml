@@ -1,7 +1,7 @@
 ﻿<?xml version="1.0" encoding="utf-8" ?>
 <Patch>
 	<Operation Class="PatchOperationAdd">
-	  <xpath>//DesignationCategoryDef[defName = "Orders"]/specialDesignatorClasses</xpath>
+	  <xpath>*/DesignationCategoryDef[defName = "Orders"]/specialDesignatorClasses</xpath>
 	  <value>
 		<li>ZhentarTweaks.SunLampPlanDesignatorAdd</li>
 	  </value>
