@@ -4,9 +4,10 @@ using System.Linq;
 using System.Reflection;
 using System.Runtime.CompilerServices;
 using System.Text;
-using Harmony;
 using Verse;
-
+#if HARMONY
+using Harmony;
+#endif
 
 namespace ZhentarTweaks
 {
@@ -102,6 +103,7 @@ namespace ZhentarTweaks
 			}
 			DoConstructorDetours();
 
+#if HARMONY
 			var harmony = HarmonyInstance.Create("ZhentarTweaks");
 			harmony.PatchAll(typeof(Detours).Assembly);
 
@@ -124,6 +126,7 @@ namespace ZhentarTweaks
 				}
 				harmony.Patch(pair.sourceMethod, null, new HarmonyMethod((MethodInfo)pair.destinationMethod));
 			}
+#endif
 		}
 
 		private static void DoConstructorDetours()
