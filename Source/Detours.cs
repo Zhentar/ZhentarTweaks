@@ -143,9 +143,10 @@ namespace ZhentarTweaks
 
 			foreach (var type in toTypes)
 			{
-				foreach (var constructor in type.GetMembers(UniversalBindingFlags).OfType<MethodBase>().Where(c => c.HasAttribute<TAttribute>()))
-				{
-					constructor.TryGetAttribute<TAttribute>(out var detour);
+				foreach (var constructor in type.GetMembers(UniversalBindingFlags).OfType<MethodBase>().Where(c => c.HasAttribute<TAttribute>())) {
+				    TAttribute detour;
+
+                    constructor.TryGetAttribute<TAttribute>(out detour);
 
 					var targetConstructor = detour.TargetClass.GetConstructors(UniversalBindingFlags)
 							.FirstOrDefault(ctor => (ctor.GetParameters().Select(checkParameter => checkParameter.ParameterType)
@@ -190,9 +191,10 @@ namespace ZhentarTweaks
 			var destinationMethods = destinationType
 				.GetMethods(UniversalBindingFlags)
 				.Where(destinationMethod => destinationMethod.HasAttribute<TAttribute>());
-			foreach (var destinationMethod in destinationMethods)
-			{
-				if (destinationMethod.TryGetAttribute<TAttribute>(out var attribute))
+			foreach (var destinationMethod in destinationMethods) {
+			    TAttribute attribute;
+
+                if (destinationMethod.TryGetAttribute<TAttribute>(out attribute))
 				{
 					var memberClass = GetDetourTargetClass(destinationMethod, attribute);
 					if (memberClass == null)
@@ -221,9 +223,10 @@ namespace ZhentarTweaks
 			var destinationProperties = destinationType
 				.GetProperties(UniversalBindingFlags)
 				.Where(destinationProperty => destinationProperty.HasAttribute<TAttribute>());
-			foreach (var destinationProperty in destinationProperties)
-			{
-				if (destinationProperty.TryGetAttribute<TAttribute>(out var attribute))
+			foreach (var destinationProperty in destinationProperties) {
+			    TAttribute attribute;
+
+                if (destinationProperty.TryGetAttribute<TAttribute>(out attribute))
 				{
 					var memberClass = GetDetourTargetClass(destinationProperty, attribute);
 					if (memberClass == null)
