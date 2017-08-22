@@ -2,92 +2,67 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
+using System.Reflection.Emit;
 using System.Text;
+using Harmony;
 using RimWorld;
 using UnityEngine;
 using Verse;
 using Verse.Sound;
+using System.Linq;
 
 namespace ZhentarTweaks
 {
 	[StaticConstructorOnStartup]
+    [HarmonyPatch(typeof(ThingFilterUI), nameof(ThingFilterUI.DoThingFilterConfigWindow))]
 	static class MarketValueThingFilterUI
 	{
 		private static float viewHeight;
 
-		[DetourMember(typeof(ThingFilterUI))]
-		public static void DoThingFilterConfigWindow(Rect rect, ref Vector2 scrollPosition, ThingFilter filter, ThingFilter parentFilter = null, int openMask = 1, IEnumerable<ThingDef> forceHiddenDefs = null, IEnumerable<SpecialThingFilterDef> forceHiddenFilters = null, List<ThingDef> suppressSmallVolumeTags = null)
-		{
-			Widgets.DrawMenuSection(rect);
-			Text.Font = GameFont.Tiny;
-			float num = rect.width - 2f;
-			Rect rect2 = new Rect(rect.x + 1f, rect.y + 1f, num / 2f, 24f);
-			if (Widgets.ButtonText(rect2, "ClearAll".Translate()))
-			{
-				filter.SetDisallowAll(forceHiddenDefs, forceHiddenFilters);
-			}
-			Rect rect3 = new Rect(rect2.xMax + 1f, rect2.y, rect.xMax - 1f - (rect2.xMax + 1f), 24f);
-			if (Widgets.ButtonText(rect3, "AllowAll".Translate()))
-			{
-				filter.SetAllowAll(parentFilter);
-			}
-			Text.Font = GameFont.Small;
-			rect.yMin = rect2.yMax;
-			Rect viewRect = new Rect(0f, 0f, rect.width - 16f, viewHeight);
-			Widgets.BeginScrollView(rect, ref scrollPosition, viewRect);
-			float num2 = 2f;
-			DrawHitPointsFilterConfig(ref num2, viewRect.width, filter);
-			DrawQualityFilterConfig(ref num2, viewRect.width, filter);
-			DrawMarketValueFilterConfig(ref num2, viewRect.width, filter);
-			float num3 = num2;
-			Rect rect4 = new Rect(0f, num2, viewRect.width, 9999f);
-			Listing_TreeThingFilter listing_TreeThingFilter = new Listing_TreeThingFilter(filter, parentFilter, forceHiddenDefs, forceHiddenFilters, suppressSmallVolumeTags);
-			listing_TreeThingFilter.Begin(rect4);
-			TreeNode_ThingCategory node = ThingCategoryNodeDatabase.RootNode;
-			if (parentFilter != null)
-			{
-				node = parentFilter.DisplayRootCategory;
-			}
-			listing_TreeThingFilter.DoCategoryChildren(node, 0, openMask, true);
-			listing_TreeThingFilter.End();
-			if (Event.current.type == EventType.Layout)
-			{
-				viewHeight = num3 + listing_TreeThingFilter.CurHeight + 90f;
-			}
-			Widgets.EndScrollView();
-		}
+        /// <remarks>
+        /// No complete detour - would kill any other mod modifying this method.
+        /// Instead change vanilla code fragment from
+		/// <code>
+		/// ...
+		///	ThingFilterUI.DrawQualityFilterConfig(ref num2, viewRect.width, filter);
+		///	float num3 = num2;
+		/// ...
+		/// </code>	
+		/// to
+		/// <code>
+		/// ...
+		///	ThingFilterUI.DrawQualityFilterConfig(ref num2, viewRect.width, filter);
+		/// MarketValueThingFilterUI.DrawMarketValueFilterConfig(ref num2, viewRect.width, filter);		// *** new call ***
+		///	float num3 = num2;
+		/// ...
+		/// </code>
+        /// </remarks>
+        public static IEnumerable<CodeInstruction> Transpiler(IEnumerable<CodeInstruction> instr) {
+            var anchorOperand = typeof(ThingFilterUI).GetMethod("DrawQualityFilterConfig", BindingFlags.Static | BindingFlags.NonPublic);
 
-		private static void DrawHitPointsFilterConfig(ref float y, float width, ThingFilter filter)
-		{
-			if (!filter.allowedHitPointsConfigurable)
-			{
-				return;
-			}
-			Rect rect = new Rect(20f, y, width - 20f, 26f);
-			FloatRange allowedHitPointsPercents = filter.AllowedHitPointsPercents;
-			Widgets.FloatRange(rect, 1, ref allowedHitPointsPercents, 0f, 1f, "HitPoints", ToStringStyle.PercentZero);
-			filter.AllowedHitPointsPercents = allowedHitPointsPercents;
-			y += 26f;
-			y += 5f;
-			Text.Font = GameFont.Small;
-		}
+            var instructions = instr.ToList();
 
-		private static void DrawQualityFilterConfig(ref float y, float width, ThingFilter filter)
-		{
-			if (!filter.allowedQualitiesConfigurable)
-			{
-				return;
-			}
-			Rect rect = new Rect(20f, y, width - 20f, 26f);
-			QualityRange allowedQualityLevels = filter.AllowedQualityLevels;
-			Widgets.QualityRange(rect, 2, ref allowedQualityLevels);
-			filter.AllowedQualityLevels = allowedQualityLevels;
-			y += 26f;
-			y += 5f;
-			Text.Font = GameFont.Small;
-		}
+            var idxAnchor = instructions.FindIndex(ci => ci.opcode == OpCodes.Call && anchorOperand.Equals(ci.operand));
 
-		private static void DrawMarketValueFilterConfig(ref float y, float width, ThingFilter filter)
+            if (idxAnchor == -1) {
+                Log.Error("ZhentarTweaks: Could not find 'ThingFilterUI.DoThingFilterConfigWindow' transpiler anchor - not injecting code.");
+                return instructions;
+            }
+
+            // inject IL in reverse order
+            instructions.Insert(idxAnchor + 1,
+                                new CodeInstruction(OpCodes.Call, typeof(MarketValueThingFilterUI).GetMethod(nameof(DrawMarketValueFilterConfig), BindingFlags.Static | BindingFlags.Public)));
+            instructions.Insert(idxAnchor +1, new CodeInstruction(OpCodes.Ldarg_2));
+            instructions.Insert(idxAnchor + 1,
+                                new CodeInstruction(OpCodes.Call, typeof(Rect).GetProperty(nameof(Rect.width), BindingFlags.Instance | BindingFlags.Public).GetGetMethod()));
+            instructions.Insert(idxAnchor + 1, new CodeInstruction(OpCodes.Ldloca, 4));
+            instructions.Insert(idxAnchor + 1, new CodeInstruction(OpCodes.Ldloca, 5));
+
+            return instructions;
+        }
+
+
+	    public static void DrawMarketValueFilterConfig(ref float y, float width, ThingFilter filter)
 		{
 			if (!(filter is MarketValueFilter))
 			{
